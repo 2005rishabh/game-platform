@@ -1,6 +1,5 @@
 package com.rishabh.game_platform.game.domain.model;
 
-
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -21,9 +20,9 @@ public class GameSession {
     private GameStatus status;
     private Player whitePlayer;
     private Player blackPlayer;
-    
+
     // We will define GameState next when we build the Engine
-    // private GameState state; 
-    
+    // private GameState state;
+
     private Instant createdAt;
 }

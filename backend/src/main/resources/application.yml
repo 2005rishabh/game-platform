@@ -1,0 +1,19 @@
+spring:
+  application:
+    name: game-platform
+  datasource:
+    url: jdbc:postgresql://localhost:5432/game_platform_db
+    username: game_user
+    password: game_password
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+server:
+  port: 8080
