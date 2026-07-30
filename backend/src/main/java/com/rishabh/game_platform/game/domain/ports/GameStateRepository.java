@@ -6,7 +6,7 @@ import java.util.UUID;
 import com.rishabh.game_platform.game.domain.model.GameSession;
 
 public interface GameStateRepository {
-    void save(GameSession gameSession);
+    GameSession save(GameSession gameSession);
 
     Optional<GameSession> findById(UUID gameId);
 

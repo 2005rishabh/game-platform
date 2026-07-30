@@ -18,8 +18,8 @@ public class GameSession {
     private UUID gameId;
     private GameType gameType;
     private GameStatus status;
-    private Player whitePlayer;
-    private Player blackPlayer;
+    private Player player1;
+    private Player player2;
     private GameState state;
 
     private Instant createdAt;
