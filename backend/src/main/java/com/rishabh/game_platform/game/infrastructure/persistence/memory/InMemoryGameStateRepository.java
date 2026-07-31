@@ -4,10 +4,13 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.springframework.stereotype.Repository;
+
 import com.rishabh.game_platform.game.domain.model.GameSession;
 import com.rishabh.game_platform.game.domain.ports.GameStateRepository;
 
-public class InMemoryGameStateRepository implements GameStateRepository{
+@Repository
+public class InMemoryGameStateRepository implements GameStateRepository {
     private final ConcurrentHashMap<UUID, GameSession> activeGames = new ConcurrentHashMap<>();
 
     @Override
@@ -26,5 +29,4 @@ public class InMemoryGameStateRepository implements GameStateRepository{
         activeGames.remove(gameId);
     }
 
-    
 }

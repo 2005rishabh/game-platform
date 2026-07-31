@@ -16,4 +16,5 @@ public class Player {
     private Long userId;
     private String username;
     private PlayerColor color;
+    private Integer eloRating;
 }
