@@ -1,18 +1,72 @@
-import React, { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useWebSocket } from "../hooks/useWebSocket";
 
-export const Dashboard = () => {
+export default function Dashboard() {
   const [isSearching, setIsSearching] = useState(false);
+  const { stompClient, isConnected } = useWebSocket();
   const navigate = useNavigate();
 
+  // Generate a mock Player ID for now (until I wire up JWT login)
+  const [playerId] = useState(() => crypto.randomUUID());
+
+  useEffect(() => {
+    // If the user cancels the search or leaves the page, make sure to clean up
+    return () => {
+      if (isSearching && stompClient && stompClient.connected) {
+        stompClient.publish({
+          destination: "/app/matchmaking.cancel",
+          body: JSON.stringify({ playerId }),
+        });
+      }
+    };
+  }, [isSearching, stompClient, playerId]);
+
   const handleFindMatch = () => {
+    if (!isConnected || !stompClient) {
+      console.error("Cannot search for match: WebSocket disconnected.");
+      return;
+    }
+
     setIsSearching(true);
-    // Simulate a matchmaking queue delay for now
-    setTimeout(() => {
-      const mockSessionId = crypto.randomUUID();
-      navigate(`/game/${mockSessionId}`);
-    }, 2500);
+
+    // 1. Subscribe to a unique channel to listen for our match
+    const subscription = stompClient.subscribe(
+      `/topic/match/${playerId}`,
+      (message) => {
+        const matchData = JSON.parse(message.body);
+
+        console.log("Match found!", matchData);
+
+        // Clean up the subscription since we found a match
+        subscription.unsubscribe();
+
+        // Route the user to the live game room
+        navigate(`/game/${matchData.sessionId}`);
+      },
+    );
+
+    // 2. Publish our request to join the queue
+    stompClient.publish({
+      destination: "/app/matchmaking.join",
+      body: JSON.stringify({
+        playerId: playerId,
+        username: "Guest_" + playerId.substring(0, 4),
+        eloRating: 1200,
+      }),
+    });
   };
+
+  const handleCancelSearch = () => {
+    setIsSearching(false);
+    if (stompClient && stompClient.connected) {
+      stompClient.publish({
+        destination: "/app/matchmaking.cancel",
+        body: JSON.stringify({ playerId }),
+      });
+    }
+  };
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen px-4 bg-[var(--color-charcoal)]">
       {/* Header Section */}
@@ -29,21 +83,21 @@ export const Dashboard = () => {
       <div className="flex flex-col items-center space-y-6">
         <button
           onClick={handleFindMatch}
-          disabled={isSearching}
+          disabled={isSearching || !isConnected}
           className={`
             px-12 py-4 rounded-sm text-sm tracking-[0.2em] uppercase font-bold transition-all duration-300 border
             ${
-              isSearching
+              isSearching || !isConnected
                 ? "bg-transparent border-[var(--color-premium-gold)]/30 text-[var(--color-premium-gold)]/50 cursor-not-allowed"
                 : "bg-gradient-to-b from-[var(--color-premium-gold)] to-[#AA8C2C] border-[#F3E5AB] text-[var(--color-charcoal)] hover:shadow-[0_0_20px_rgba(212,175,55,0.3)] hover:scale-[1.02]"
             }
           `}
         >
-          {isSearching ? "Searching..." : "Find Match"}
-        </button>
-
-        <button className="text-xs tracking-[0.15em] text-gray-400 hover:text-white uppercase transition-colors">
-          Create Custom Room &rarr;
+          {isSearching
+            ? "Searching..."
+            : !isConnected
+              ? "Connecting..."
+              : "Find Match"}
         </button>
       </div>
 
@@ -58,7 +112,7 @@ export const Dashboard = () => {
             Searching for opponent...
           </p>
           <button
-            onClick={() => setIsSearching(false)}
+            onClick={handleCancelSearch}
             className="mt-12 text-xs tracking-[0.15em] text-gray-500 hover:text-white uppercase border border-gray-800 px-6 py-2 rounded-sm transition-colors"
           >
             Cancel Search
@@ -67,4 +121,4 @@ export const Dashboard = () => {
       )}
     </div>
   );
-};
+}
