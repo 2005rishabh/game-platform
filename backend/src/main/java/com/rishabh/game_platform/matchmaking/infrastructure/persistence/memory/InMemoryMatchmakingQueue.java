@@ -6,9 +6,13 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+import org.springframework.stereotype.Repository;
+
 import com.rishabh.game_platform.game.domain.enums.GameType;
 import com.rishabh.game_platform.game.domain.model.Player;
 import com.rishabh.game_platform.matchmaking.domain.ports.MatchmakingQueue;
+
+@Repository
 
 public class InMemoryMatchmakingQueue implements MatchmakingQueue {
 
