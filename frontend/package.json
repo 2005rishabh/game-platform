@@ -10,8 +10,17 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@stomp/stompjs": "^7.3.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "autoprefixer": "^10.5.4",
+    "chess.js": "^1.4.0",
+    "postcss": "^8.5.25",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-chessboard": "^5.12.0",
+    "react-dom": "^19.2.8",
+    "react-router-dom": "^7.18.2",
+    "sockjs-client": "^1.6.1",
+    "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
