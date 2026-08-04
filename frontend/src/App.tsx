@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import Dashboard from "./pages/Dashboard";
 import GameRoom from "./pages/GameRoom";
+import { Dashboard } from "./pages/Dashboard";
 
 export const App = () => {
   return (
@@ -16,3 +16,5 @@ export const App = () => {
     </Router>
   );
 };
+
+export default App;
