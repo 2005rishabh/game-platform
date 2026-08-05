@@ -8,4 +8,8 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  define: {
+    // This polyfills 'global' for sockjs-client to prevent it from crashing the browser
+    global: 'window',
+  },
 })

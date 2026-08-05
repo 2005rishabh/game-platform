@@ -1,9 +1,12 @@
 package com.rishabh.game_platform.matchmaking.application.service;
 
-import java.util.Optional;
-import java.util.UUID;
-
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+
+import java.util.Map;
+import java.util.Queue;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import com.rishabh.game_platform.game.application.service.GameService;
 import com.rishabh.game_platform.game.domain.enums.GameType;
@@ -14,32 +17,39 @@ import com.rishabh.game_platform.matchmaking.domain.ports.MatchmakingQueue;
 import lombok.RequiredArgsConstructor;
 
 @Service
-@RequiredArgsConstructor
 public class MatchmakingService {
-    private final MatchmakingQueue matchmakingQueue;
-    private final GameService gameService;
 
-    public Optional<GameSession> joinMatchmaking(Player player, GameType gameType) {
+    private final SimpMessagingTemplate messagingTemplate;
+    
+    // Thread-safe queue for players waiting to play
+    private final Queue<String> waitingPlayers = new ConcurrentLinkedQueue<>();
 
-        // 1. Check if anyone else is already waiting to play this game type
-        Optional<Player> opponentOpt = matchmakingQueue.extractOpponent(gameType, player);
+    public MatchmakingService(SimpMessagingTemplate messagingTemplate) {
+        this.messagingTemplate = messagingTemplate;
+    }
 
-        if (opponentOpt.isPresent()) {
-            // 2. Found someone so create a new game with the waiting player as the host
-            Player host = opponentOpt.get();
-            GameSession newSession = gameService.createGame(host, gameType);
+    public void processJoinRequest(String playerId) {
+        System.out.println("Player joined queue: " + playerId);
 
-            // 3. Add our current player to the newly created game
-            GameSession startedSession = gameService.joinGame(newSession.getGameId(), player);
-            return Optional.of(startedSession);
-        } else {
-            // 4. Nobody is waiting. Put this player in the queue.
-            return Optional.empty();
+        // Add to queue if they aren't already waiting
+        if (!waitingPlayers.contains(playerId)) {
+            waitingPlayers.add(playerId);
+        }
+
+        // Matchmaking logic: 2 players found
+        if (waitingPlayers.size() >= 2) {
+            String player1 = waitingPlayers.poll();
+            String player2 = waitingPlayers.poll();
+
+            String sessionId = UUID.randomUUID().toString();
+            System.out.println("Match found! Creating GameRoom: " + sessionId);
+
+            // Construct the payload expected by your React frontend
+            Map<String, String> matchData = Map.of("sessionId", sessionId);
+
+            // Broadcast the Session ID back to both players' specific private topics
+            messagingTemplate.convertAndSend("/topic/match/" + player1, matchData);
+            messagingTemplate.convertAndSend("/topic/match/" + player2, matchData);
         }
     }
-
-    public void leaveMatchmaking(UUID playerId) {
-        matchmakingQueue.removePlayer(playerId);
-    }
-
 }

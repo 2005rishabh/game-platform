@@ -25,8 +25,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         // This is the initial handshake URL the React frontend uses to establish the
         // connection
-        registry.addEndpoint("/ws-game")
-                .setAllowedOriginPatterns("*") // Allows cross-origin requests from your frontend
+        registry.addEndpoint("/ws")
+                .setAllowedOrigins("http://localhost:5173", "http://127.0.0.1:5173") // <-- THE BOUNCER PASS
                 .withSockJS();
     }
 }
