@@ -6,7 +6,10 @@ const getStoredToken = () => {
     return null;
   }
 
-  const storedToken = localStorage.getItem('token') ?? localStorage.getItem('jwt');
+  const storedToken = localStorage.getItem('token')
+    ?? localStorage.getItem('jwt')
+    ?? localStorage.getItem('accessToken')
+    ?? localStorage.getItem('access_token');
   return storedToken ?? null;
 };
 
