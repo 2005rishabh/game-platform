@@ -36,11 +36,11 @@ public class GameWebSocketController {
                         @Payload MoveRequest moveRequest,
                         Principal principal) {
 
-                // Fallback to a default username if WebSocket principal is not authenticated
-                // yet
-                String username = (principal != null) ? principal.getName() : "rishabh"; // Change "rishabh" to your
-                                                                                         // database username if
-                                                                                         // different
+                if (principal == null) {
+                        throw new IllegalStateException("Authenticated principal is required for game moves");
+                }
+
+                String username = principal.getName();
 
                 UserEntity user = userRepository.findByUsername(username)
                                 .orElseThrow(() -> new RuntimeException("User not found in DB: " + username));

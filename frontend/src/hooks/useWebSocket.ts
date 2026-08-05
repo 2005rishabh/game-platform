@@ -1,13 +1,23 @@
-import { useEffect, useState } from 'react';
-import { Client } from '@stomp/stompjs';
+import { useEffect, useRef, useState } from 'react';
+import { Client, StompSubscription } from '@stomp/stompjs';
 import { createStompClient } from '../services/socket';
+
+type GameSessionPayload = {
+  state?: {
+    boardState?: string;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+};
 
 export const useWebSocket = () => {
   const [stompClient, setStompClient] = useState<Client | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const clientRef = useRef<Client | null>(null);
 
   useEffect(() => {
     const client = createStompClient();
+    clientRef.current = client;
 
     client.onConnect = (frame) => {
       console.log('⚡ Connected to Spring Boot STOMP Broker', frame);
@@ -34,7 +44,22 @@ export const useWebSocket = () => {
     };
   }, []);
 
-  // Add this function inside your useWebSocket hook
+  const subscribeToGame = (sessionId: string, callback: (payload: GameSessionPayload) => void): StompSubscription | null => {
+    const client = clientRef.current;
+
+    if (!client || !client.active) {
+      return null;
+    }
+
+    return client.subscribe(`/topic/game/${sessionId}`, (message) => {
+      try {
+        callback(JSON.parse(message.body) as GameSessionPayload);
+      } catch (error) {
+        console.error('Failed to parse game session payload:', error);
+      }
+    });
+  };
+
   const publishMove = (sessionId: string, sourceSquare: string, targetSquare: string) => {
     // Ensure the client exists and is actually connected before sending
     if (stompClient && stompClient.active) {
@@ -55,5 +80,5 @@ export const useWebSocket = () => {
     }
   };
 
-  return { stompClient, isConnected, publishMove };
+  return { stompClient, isConnected, publishMove, subscribeToGame };
 };
