@@ -34,5 +34,26 @@ export const useWebSocket = () => {
     };
   }, []);
 
-  return { stompClient, isConnected };
+  // Add this function inside your useWebSocket hook
+  const publishMove = (sessionId: string, sourceSquare: string, targetSquare: string) => {
+    // Ensure the client exists and is actually connected before sending
+    if (stompClient && stompClient.active) {
+      const movePayload = {
+        from: sourceSquare,    // Changed to match MoveRequest.java
+        to: targetSquare,      // Changed to match MoveRequest.java
+        promotion: "q"
+      };
+
+      stompClient.publish({
+        destination: `/app/game/${sessionId}/move`,
+        body: JSON.stringify(movePayload),
+      });
+      
+      console.log("Move broadcasted to server:", movePayload);
+    } else {
+      console.error("STOMP client is not connected. Cannot send move.");
+    }
+  };
+
+  return { stompClient, isConnected, publishMove };
 };

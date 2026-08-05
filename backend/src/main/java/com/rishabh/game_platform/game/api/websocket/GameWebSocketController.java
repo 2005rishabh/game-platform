@@ -23,35 +23,43 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class GameWebSocketController {
 
-    private final GameService gameService;
-    private final SimpMessagingTemplate messagingTemplate; // Spring's built-in message broadcaster
-    private final UserRepository userRepository;
+        private final GameService gameService;
+        private final SimpMessagingTemplate messagingTemplate; // Spring's built-in message broadcaster
+        private final UserRepository userRepository;
 
-    /**
-     * Maps to the /app/game/{sessionId}/move endpoint defined in our
-     * WebSocketConfig
-     */
-    @MessageMapping("/game/{sessionId}/move")
-    public void executeMove(@DestinationVariable UUID sessionId,
-            @Payload MoveRequest moveRequest,
-            Principal principal) {
-        UserEntity user = userRepository.findByUsername(principal.getName())
-                .orElseThrow(() -> new RuntimeException("User not found in DB"));
+        /**
+         * Maps to the /app/game/{sessionId}/move endpoint defined in our
+         * WebSocketConfig
+         */
+        @MessageMapping("/game/{sessionId}/move")
+        public void executeMove(@DestinationVariable UUID sessionId,
+                        @Payload MoveRequest moveRequest,
+                        Principal principal) {
 
-        Player player = Player.builder()
-                .userId(user.getId())
-                .username(user.getUsername())
-                .eloRating(user.getEloRating() != null ? user.getEloRating() : 1200)
-                .build();
+                // Fallback to a default username if WebSocket principal is not authenticated
+                // yet
+                String username = (principal != null) ? principal.getName() : "rishabh"; // Change "rishabh" to your
+                                                                                         // database username if
+                                                                                         // different
 
-        Move move = Move.builder()
-                .from(moveRequest.getFrom())
-                .to(moveRequest.getTo())
-                .promotion(moveRequest.getPromotion())
-                .build();
+                UserEntity user = userRepository.findByUsername(username)
+                                .orElseThrow(() -> new RuntimeException("User not found in DB: " + username));
 
-        GameSession updatedSession = gameService.executeMove(sessionId, player, move);
+                Player player = Player.builder()
+                                .userId(user.getId())
+                                .username(user.getUsername())
+                                .eloRating(user.getEloRating() != null ? user.getEloRating() : 1200)
+                                .build();
 
-        messagingTemplate.convertAndSend("/topic/game/" + sessionId, updatedSession);
-    }
+                Move move = Move.builder()
+                                .from(moveRequest.getFrom())
+                                .to(moveRequest.getTo())
+                                .promotion(moveRequest.getPromotion())
+                                .build();
+
+                GameSession updatedSession = gameService.executeMove(sessionId, player, move);
+
+                // Broadcast the authoritative session state back to all clients in this room
+                messagingTemplate.convertAndSend("/topic/game/" + sessionId, updatedSession);
+        }
 }

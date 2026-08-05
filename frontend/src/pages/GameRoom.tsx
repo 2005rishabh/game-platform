@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { Chess } from "chess.js";
 import { Chessboard } from "react-chessboard";
@@ -6,39 +6,103 @@ import { useWebSocket } from "../hooks/useWebSocket";
 
 export default function GameRoom() {
   const { sessionId } = useParams();
-  const { isConnected } = useWebSocket();
+
+  // Extract all the necessary variables and functions from the hook
+  const { isConnected, publishMove, subscribeToGame, stompClient } =
+    useWebSocket();
 
   // Initialize the headless chess engine
   const [game, setGame] = useState(new Chess());
 
-  // Function to handle when a player drops a piece
-  function onDrop(sourceSquare: string, targetSquare: string) {
-    // Create a copy of the game state to mutate safely
-    const gameCopy = new Chess(game.fen());
+  // 📥 NEW: Listen for opponent moves and authoritative state from the server
+  useEffect(() => {
+    // Wait until the connection is fully established before subscribing
+    if (!isConnected || !sessionId || !stompClient || !subscribeToGame) return;
+
+    console.log("Subscribing to game room channel: ", sessionId);
+
+    const subscription = subscribeToGame(sessionId, (incomingSession) => {
+      console.log(
+        "📥 Authoritative game state received from server!",
+        incomingSession,
+      );
+
+      // Verify the payload structure matches your Java GameSession & GameState models
+      if (
+        incomingSession &&
+        incomingSession.state &&
+        incomingSession.state.boardState
+      ) {
+        setGame((currentGame) => {
+          const gameCopy = new Chess();
+          try {
+            // Force the local UI board to exactly match the server's FEN string
+            gameCopy.load(incomingSession.state.boardState);
+            return gameCopy;
+          } catch (e) {
+            console.error("Failed to load authoritative FEN from server:", e);
+            return currentGame;
+          }
+        });
+      }
+    });
+
+    // Cleanup: Unsubscribe when the player leaves the room/component unmounts
+    return () => {
+      if (subscription) subscription.unsubscribe();
+    };
+  }, [isConnected, sessionId, stompClient, subscribeToGame]);
+
+  function onDrop({
+    sourceSquare,
+    targetSquare,
+  }: {
+    sourceSquare: string;
+    targetSquare: string | null;
+  }) {
+    if (!targetSquare) {
+      return false;
+    }
+
+    console.log(`Attempting to move from ${sourceSquare} to ${targetSquare}`);
 
     try {
-      // Attempt to make the move locally
+      const gameCopy = new Chess(game.fen());
       const move = gameCopy.move({
         from: sourceSquare,
         to: targetSquare,
-        promotion: "q", // Automatically promote to Queen for now
+        promotion: "q",
       });
 
-      // If the move is illegal, chess.js throws an error or returns null
-      if (move === null) return false;
+      if (move === null) {
+        console.warn("chess.js rejected the move as illegal.");
+        return false;
+      }
 
-      // Update the local board state
       setGame(gameCopy);
+      console.log("Move successful on the local board!");
 
-      // TODO: Publish this move to the Spring Boot backend via STOMP here
-      // stompClient.publish({ destination: `/app/game/${sessionId}/move`, body: ... })
+      // 🚀 FIRE THE MOVE TO THE SPRING BOOT BACKEND
+      if (sessionId && publishMove) {
+        publishMove(sessionId, sourceSquare, targetSquare);
+      }
 
       return true;
     } catch (error) {
-      // Illegal move attempted
+      console.error("Critical crash in onDrop:", error);
       return false;
     }
   }
+
+  const boardOptions = {
+    position: game.fen(),
+    onPieceDrop: onDrop,
+    allowDragging: true,
+    boardStyle: { touchAction: "none" },
+    darkSquareStyle: { backgroundColor: "#475569" },
+    lightSquareStyle: { backgroundColor: "#94A3B8" },
+    animationDurationInMs: 300,
+  };
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-[var(--color-midnight)]">
@@ -46,7 +110,7 @@ export default function GameRoom() {
       <div className="w-full max-w-3xl flex justify-between items-center mb-8 px-6 py-4 bg-[var(--color-charcoal)] border border-gray-800 rounded-sm shadow-xl">
         <div>
           <h2 className="text-xl font-serif text-white tracking-widest uppercase">
-            Ranked Match
+            TESTING MATCH
           </h2>
           <p className="text-xs text-gray-500 font-mono tracking-wider">
             ID: {sessionId}
@@ -71,22 +135,15 @@ export default function GameRoom() {
       <div className="w-full max-w-3xl flex flex-col md:flex-row gap-8 items-center justify-center">
         {/* Chessboard Container */}
         <div className="w-full max-w-[500px] aspect-square shadow-[0_0_40px_rgba(0,0,0,0.8)] border border-gray-800 rounded-sm overflow-hidden p-2 bg-[var(--color-charcoal)]">
-          <Chessboard
-            // @ts-expect-error - TS is failing to load react-chessboard types
-            position={game.fen()}
-            onPieceDrop={onDrop}
-            customDarkSquareStyle={{ backgroundColor: "#475569" }}
-            customLightSquareStyle={{ backgroundColor: "#94A3B8" }}
-            animationDuration={300}
-          />
+          <Chessboard options={boardOptions} />
         </div>
+
         {/* Move History Sidebar */}
         <div className="w-full md:w-64 h-[500px] bg-[var(--color-charcoal)] border border-gray-800 rounded-sm p-4 flex flex-col shadow-xl">
           <h3 className="text-sm font-serif text-[var(--color-premium-gold)] tracking-[0.2em] uppercase mb-4 border-b border-gray-700 pb-2">
             Live Notation
           </h3>
           <div className="flex-1 overflow-y-auto font-mono text-sm text-gray-300 space-y-2">
-            {/* We will map over actual moves here later */}
             <p className="text-gray-500 italic text-xs text-center mt-4">
               Waiting for first move...
             </p>
