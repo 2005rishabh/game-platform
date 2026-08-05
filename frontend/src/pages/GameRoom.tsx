@@ -28,16 +28,14 @@ export default function GameRoom() {
       );
 
       // Verify the payload structure matches your Java GameSession & GameState models
-      if (
-        incomingSession &&
-        incomingSession.state &&
-        incomingSession.state.boardState
-      ) {
+      const boardState = incomingSession?.state?.boardState;
+
+      if (boardState) {
         setGame((currentGame) => {
           const gameCopy = new Chess();
           try {
             // Force the local UI board to exactly match the server's FEN string
-            gameCopy.load(incomingSession.state.boardState);
+            gameCopy.load(boardState);
             return gameCopy;
           } catch (e) {
             console.error("Failed to load authoritative FEN from server:", e);

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Client, StompSubscription } from '@stomp/stompjs';
+import type { Client, StompSubscription } from '@stomp/stompjs';
 import { createStompClient } from '../services/socket';
 
 type GameSessionPayload = {
