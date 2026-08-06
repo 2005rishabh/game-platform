@@ -47,13 +47,20 @@ public class GameController {
     */
 
     private Player getAuthenticatedPlayer(Principal principal) {
-        UserEntity user = userRepository.findByUsername(principal.getName())
-        .orElseThrow(() -> new RuntimeException("Authenticated user not found in DB"));
+        if (principal == null || principal.getName() == null || principal.getName().isBlank()) {
+            throw new IllegalArgumentException("Authenticated principal is required");
+        }
 
-        return Player.builder()
-        .userId(user.getId())
-        .username(user.getUsername())
-        .eloRating(user.getEloRating() != null ? user.getEloRating() : 1200)
-        .build();
+        String username = principal.getName();
+        return userRepository.findByUsername(username)
+                .map(user -> Player.builder()
+                        .userId(user.getId())
+                        .username(user.getUsername())
+                        .eloRating(user.getEloRating() != null ? user.getEloRating() : 1200)
+                        .build())
+                .orElseGet(() -> Player.builder()
+                        .username(username)
+                        .eloRating(1200)
+                        .build());
     }
 }

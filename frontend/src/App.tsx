@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import GameRoom from "./pages/GameRoom";
+import Login from "./pages/Login";
 import { useWebSocket } from "./hooks/useWebSocket";
 
 function App() {
@@ -19,6 +20,7 @@ function App() {
 
         <Routes>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/login" element={<Login />} />
           <Route path="/game/:sessionId" element={<GameRoom />} />
         </Routes>
       </div>

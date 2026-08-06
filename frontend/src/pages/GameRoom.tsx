@@ -66,13 +66,26 @@ export default function GameRoom() {
 
     try {
       const gameCopy = new Chess(game.fen());
-      const move = gameCopy.move({
-        from: sourceSquare,
-        to: targetSquare,
-        promotion: "q",
-      });
+      const movingPiece = gameCopy.get(sourceSquare as any);
+      const isPawn = movingPiece && movingPiece.type === "p";
+      const isPromotionRank =
+        (movingPiece?.color === "w" && targetSquare.endsWith("8")) ||
+        (movingPiece?.color === "b" && targetSquare.endsWith("1"));
+      const promotionChoice = isPawn && isPromotionRank ? "q" : undefined;
 
-      if (move === null) {
+      let move;
+      try {
+        move = gameCopy.move({
+          from: sourceSquare,
+          to: targetSquare,
+          promotion: promotionChoice,
+        });
+      } catch {
+        console.warn(`Illegal or out-of-turn move: ${sourceSquare} to ${targetSquare}`);
+        return false;
+      }
+
+      if (!move) {
         console.warn("chess.js rejected the move as illegal.");
         return false;
       }
@@ -82,12 +95,12 @@ export default function GameRoom() {
 
       // 🚀 FIRE THE MOVE TO THE SPRING BOOT BACKEND
       if (sessionId && publishMove) {
-        publishMove(sessionId, sourceSquare, targetSquare);
+        publishMove(sessionId, sourceSquare, targetSquare, promotionChoice);
       }
 
       return true;
     } catch (error) {
-      console.error("Critical crash in onDrop:", error);
+      console.error("Error in onDrop:", error);
       return false;
     }
   }

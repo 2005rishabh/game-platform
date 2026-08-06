@@ -14,6 +14,8 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.Arrays;
 
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
@@ -31,12 +33,15 @@ public class SecurityConfig {
             // 2. CSRF must be disabled for SockJS to negotiate the connection
             .csrf(csrf -> csrf.disable())
             
-            // 3. Add the WebSocket path to existing authorization rules
+            // 3. Permit WebSocket handshake, authentication endpoints, and error path
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/ws/**").permitAll() // <-- ADD THIS LINE
-                // ... keep other existing request matchers here ...
+                .requestMatchers("/ws/**", "/auth/api/**", "/error").permitAll()
                 .anyRequest().authenticated() 
-            );
+            )
+
+            // 4. Configure authentication provider & JWT filter
+            .authenticationProvider(authenticationProvider)
+            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
             
         return http.build();
     }

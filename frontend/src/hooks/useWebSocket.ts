@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Client, StompSubscription } from '@stomp/stompjs';
 import { createStompClient } from '../services/socket';
 
@@ -44,41 +44,49 @@ export const useWebSocket = () => {
     };
   }, []);
 
-  const subscribeToGame = (sessionId: string, callback: (payload: GameSessionPayload) => void): StompSubscription | null => {
-    const client = clientRef.current;
+  const subscribeToGame = useCallback(
+    (sessionId: string, callback: (payload: GameSessionPayload) => void): StompSubscription | null => {
+      const client = clientRef.current;
 
-    if (!client || !client.active) {
-      return null;
-    }
-
-    return client.subscribe(`/topic/game/${sessionId}`, (message) => {
-      try {
-        callback(JSON.parse(message.body) as GameSessionPayload);
-      } catch (error) {
-        console.error('Failed to parse game session payload:', error);
+      if (!client || !client.active) {
+        return null;
       }
-    });
-  };
 
-  const publishMove = (sessionId: string, sourceSquare: string, targetSquare: string) => {
-    // Ensure the client exists and is actually connected before sending
-    if (stompClient && stompClient.active) {
-      const movePayload = {
-        from: sourceSquare,    // Changed to match MoveRequest.java
-        to: targetSquare,      // Changed to match MoveRequest.java
-        promotion: "q"
-      };
-
-      stompClient.publish({
-        destination: `/app/game/${sessionId}/move`,
-        body: JSON.stringify(movePayload),
+      return client.subscribe(`/topic/game/${sessionId}`, (message) => {
+        try {
+          callback(JSON.parse(message.body) as GameSessionPayload);
+        } catch (error) {
+          console.error('Failed to parse game session payload:', error);
+        }
       });
-      
-      console.log("Move broadcasted to server:", movePayload);
-    } else {
-      console.error("STOMP client is not connected. Cannot send move.");
-    }
-  };
+    },
+    []
+  );
+
+  const publishMove = useCallback(
+    (sessionId: string, sourceSquare: string, targetSquare: string, promotion?: string) => {
+      const client = clientRef.current;
+      if (client && client.active) {
+        const movePayload: { from: string; to: string; promotion?: string } = {
+          from: sourceSquare,
+          to: targetSquare,
+        };
+        if (promotion) {
+          movePayload.promotion = promotion;
+        }
+
+        client.publish({
+          destination: `/app/game/${sessionId}/move`,
+          body: JSON.stringify(movePayload),
+        });
+
+        console.log('Move broadcasted to server:', movePayload);
+      } else {
+        console.error('STOMP client is not connected. Cannot send move.');
+      }
+    },
+    []
+  );
 
   return { stompClient, isConnected, publishMove, subscribeToGame };
 };

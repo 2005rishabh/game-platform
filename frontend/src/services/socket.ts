@@ -14,14 +14,16 @@ const getStoredToken = () => {
 };
 
 export const createStompClient = (token?: string) => {
-  const storedToken = token ?? getStoredToken();
-  const bearerToken = storedToken?.startsWith('Bearer ') ? storedToken : storedToken ? `Bearer ${storedToken}` : null;
-  const connectHeaders = bearerToken ? { Authorization: bearerToken } : undefined;
+  const getHeaders = () => {
+    const storedToken = token ?? getStoredToken();
+    const bearerToken = storedToken?.startsWith('Bearer ') ? storedToken : storedToken ? `Bearer ${storedToken}` : null;
+    return bearerToken ? { Authorization: bearerToken } : undefined;
+  };
 
-  return new Client({
+  const client = new Client({
     // We use SockJS as a fallback and to match the Spring Boot configuration
     webSocketFactory: () => new SockJS('http://localhost:8080/ws'),
-    connectHeaders,
+    connectHeaders: getHeaders(),
 
     // This will print STOMP frames to browser console for debugging
     debug: (msg: string) => console.log(msg),
@@ -31,4 +33,13 @@ export const createStompClient = (token?: string) => {
     heartbeatIncoming: 4000,
     heartbeatOutgoing: 4000,
   });
+
+  client.beforeConnect = () => {
+    const headers = getHeaders();
+    if (headers) {
+      client.connectHeaders = headers;
+    }
+  };
+
+  return client;
 };

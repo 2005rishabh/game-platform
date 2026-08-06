@@ -1,14 +1,16 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWebSocket } from "../hooks/useWebSocket";
+import { authService } from "../services/authService";
 
 export default function Dashboard() {
   const [isSearching, setIsSearching] = useState(false);
   const { stompClient, isConnected } = useWebSocket();
   const navigate = useNavigate();
 
-  // Generate a mock Player ID for now (until I wire up JWT login)
-  const [playerId] = useState(() => crypto.randomUUID());
+  const user = authService.getStoredUser();
+  const username = user.username;
+  const playerId = username || "Guest_" + crypto.randomUUID().substring(0, 8);
 
   useEffect(() => {
     // If the user cancels the search or leaves the page, make sure to clean up
@@ -23,6 +25,11 @@ export default function Dashboard() {
   }, [isSearching, stompClient, playerId]);
 
   const handleFindMatch = () => {
+    if (!user.token) {
+      navigate("/login");
+      return;
+    }
+
     if (!isConnected || !stompClient) {
       console.error("Cannot search for match: WebSocket disconnected.");
       return;
@@ -51,7 +58,7 @@ export default function Dashboard() {
       destination: "/app/matchmaking.join",
       body: JSON.stringify({
         playerId: playerId,
-        username: "Guest_" + playerId.substring(0, 4),
+        username: username || playerId,
         eloRating: 1200,
       }),
     });
@@ -67,8 +74,37 @@ export default function Dashboard() {
     }
   };
 
+  const handleLogout = () => {
+    authService.logout();
+    navigate("/login");
+  };
+
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen px-4 bg-[var(--color-charcoal)]">
+    <div className="flex flex-col items-center justify-center min-h-screen px-4 bg-[var(--color-charcoal)] relative">
+      {/* User Auth Status Bar */}
+      <div className="absolute top-4 right-4 z-50 flex items-center gap-4 text-xs font-mono">
+        {user.token ? (
+          <div className="flex items-center gap-3 bg-[var(--color-midnight)] border border-gray-800 px-4 py-2 rounded-sm">
+            <span className="text-[var(--color-premium-gold)] font-bold">
+              👤 {username}
+            </span>
+            <button
+              onClick={handleLogout}
+              className="text-gray-400 hover:text-white uppercase tracking-wider text-[10px] border-l border-gray-700 pl-3"
+            >
+              Sign Out
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => navigate("/login")}
+            className="bg-gradient-to-r from-[var(--color-premium-gold)] to-[#AA8C2C] text-[var(--color-charcoal)] font-bold px-4 py-2 rounded-sm uppercase tracking-wider hover:opacity-90 transition-opacity"
+          >
+            Sign In / Register
+          </button>
+        )}
+      </div>
+
       {/* Header Section */}
       <div className="text-center mb-16 space-y-4">
         <h1 className="text-5xl md:text-7xl font-serif tracking-widest text-white uppercase drop-shadow-lg">
@@ -97,7 +133,9 @@ export default function Dashboard() {
             ? "Searching..."
             : !isConnected
               ? "Connecting..."
-              : "Find Match"}
+              : user.token
+                ? "Find Match"
+                : "Sign In to Play"}
         </button>
       </div>
 

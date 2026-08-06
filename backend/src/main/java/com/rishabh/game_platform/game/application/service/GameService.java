@@ -51,11 +51,19 @@ public class GameService {
     }
 
     public GameSession executeMove(UUID sessionId, Player player, Move move) {
+        if (sessionId == null || player == null || move == null) {
+            throw new IllegalArgumentException("SessionId, player, and move must not be null");
+        }
+
         GameSession session = gameStateRepository.findById(sessionId)
                 .orElseThrow(() -> new IllegalArgumentException("Game session not found"));
 
         if (session.getStatus() != GameStatus.IN_PROGRESS) {
             throw new IllegalStateException("Game is not in progress");
+        }
+
+        if (session.getState() == null) {
+            throw new IllegalStateException("Game state is corrupted or missing");
         }
 
         if (!gameEngine.isMoveValid(session, move)) {

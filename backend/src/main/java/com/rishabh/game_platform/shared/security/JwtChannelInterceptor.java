@@ -19,6 +19,8 @@ import org.springframework.stereotype.Component;
 
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.messaging.support.MessageHeaderAccessor;
+
 @Component
 @RequiredArgsConstructor
 public class JwtChannelInterceptor implements ChannelInterceptor {
@@ -52,31 +54,37 @@ public class JwtChannelInterceptor implements ChannelInterceptor {
                 SecurityContextHolder.getContext().setAuthentication(authentication);
                 return MessageBuilder.createMessage(message.getPayload(), accessor.getMessageHeaders());
             }
+        } else if (accessor.getUser() instanceof Authentication authentication) {
+            SecurityContextHolder.getContext().setAuthentication(authentication);
         }
 
         return message;
     }
 
     private Authentication authenticate(StompHeaderAccessor accessor) {
-        String token = resolveToken(accessor);
-        if (token == null || token.isBlank()) {
+        try {
+            String token = resolveToken(accessor);
+            if (token == null || token.isBlank()) {
+                return null;
+            }
+
+            String username = jwtService.extractUsername(token);
+            if (username == null || username.isBlank()) {
+                return null;
+            }
+
+            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+            if (userDetails == null || !jwtService.isTokenValid(token, userDetails)) {
+                return null;
+            }
+
+            return new UsernamePasswordAuthenticationToken(
+                    userDetails,
+                    null,
+                    userDetails.getAuthorities());
+        } catch (Exception e) {
             return null;
         }
-
-        String username = jwtService.extractUsername(token);
-        if (username == null || username.isBlank()) {
-            return null;
-        }
-
-        UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-        if (!jwtService.isTokenValid(token, userDetails)) {
-            return null;
-        }
-
-        return new UsernamePasswordAuthenticationToken(
-                userDetails,
-                null,
-                userDetails.getAuthorities());
     }
 
     private void storeAuthentication(StompHeaderAccessor accessor, Authentication authentication) {
@@ -106,16 +114,30 @@ public class JwtChannelInterceptor implements ChannelInterceptor {
         List<String> authorizationHeaders = accessor.getNativeHeader("Authorization");
         if (authorizationHeaders != null && !authorizationHeaders.isEmpty()) {
             String headerValue = authorizationHeaders.get(0);
-            if (headerValue != null && headerValue.startsWith("Bearer ")) {
-                return headerValue.substring(7).trim();
+            if (headerValue != null) {
+                headerValue = headerValue.trim();
+                if (headerValue.startsWith("Bearer ")) {
+                    return headerValue.substring(7).trim();
+                } else if (headerValue.startsWith("Bearer")) {
+                    return headerValue.substring(6).trim();
+                } else if (!headerValue.isBlank()) {
+                    return headerValue;
+                }
             }
         }
 
         List<String> fallbackHeaders = accessor.getNativeHeader("X-Authorization");
         if (fallbackHeaders != null && !fallbackHeaders.isEmpty()) {
             String headerValue = fallbackHeaders.get(0);
-            if (headerValue != null && headerValue.startsWith("Bearer ")) {
-                return headerValue.substring(7).trim();
+            if (headerValue != null) {
+                headerValue = headerValue.trim();
+                if (headerValue.startsWith("Bearer ")) {
+                    return headerValue.substring(7).trim();
+                } else if (headerValue.startsWith("Bearer")) {
+                    return headerValue.substring(6).trim();
+                } else if (!headerValue.isBlank()) {
+                    return headerValue;
+                }
             }
         }
 

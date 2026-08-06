@@ -1,10 +1,12 @@
 package com.rishabh.game_platform.matchmaking.api.websocket;
 
-import com.rishabh.game_platform.matchmaking.application.service.MatchmakingService;
+import java.security.Principal;
+import java.util.Map;
+
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.stereotype.Controller;
 
-import java.util.Map;
+import com.rishabh.game_platform.matchmaking.application.service.MatchmakingService;
 
 @Controller
 public class MatchmakingWebSocketController {
@@ -17,11 +19,16 @@ public class MatchmakingWebSocketController {
     }
 
     @MessageMapping("/matchmaking.join")
-    public void joinMatchmaking(Map<String, Object> payload) {
-        // Extract the ID sent from React
-        String playerId = (String) payload.get("playerId");
-        
-        // Delegate to the application layer
-        matchmakingService.processJoinRequest(playerId);
+    public void joinMatchmaking(Map<String, Object> payload, Principal principal) {
+        String playerId = null;
+        if (payload != null && payload.get("playerId") instanceof String idStr) {
+            playerId = idStr;
+        } else if (principal != null && principal.getName() != null) {
+            playerId = principal.getName();
+        }
+
+        if (playerId != null && !playerId.isBlank()) {
+            matchmakingService.processJoinRequest(playerId);
+        }
     }
 }

@@ -28,6 +28,11 @@ public class ChessGameEngine implements GameEngine{
 
     @Override
     public boolean isMoveValid(GameSession session, Move move) {
+        if (session == null || session.getState() == null || session.getState().getBoardState() == null || move == null
+                || move.getFrom() == null || move.getTo() == null) {
+            return false;
+        }
+
         Board board = new Board();
         board.loadFromFen(session.getState().getBoardState());
 
@@ -36,11 +41,14 @@ public class ChessGameEngine implements GameEngine{
         var legalMoves = board.legalMoves();
 
         return legalMoves.contains(chessMove);
-
     }
 
     @Override
     public GameState executeMove(GameSession session, Move move) {
+        if (session == null || session.getState() == null || session.getState().getBoardState() == null || move == null) {
+            throw new IllegalArgumentException("Game session and move cannot be null");
+        }
+
         Board board = new Board();
         board.loadFromFen(session.getState().getBoardState());
 
@@ -56,30 +64,39 @@ public class ChessGameEngine implements GameEngine{
             newStatus = GameStatus.DRAW;
         }
 
-
         return GameState.builder()
-        .boardState(board.getFen())
-        .currentTurn(board.getSideToMove().name())
-        .status(newStatus)
-        .build();
+                .boardState(board.getFen())
+                .currentTurn(board.getSideToMove().name())
+                .status(newStatus)
+                .build();
     }
 
     /**
      * Helper method to map our pure Domain Move object into the 3rd-party library's Move object
      */
     private com.github.bhlangonijr.chesslib.move.Move convertToChesslibMove(Move move, Board board) {
-        // Converts strings like "e2" to Square.E2
-        Square fromSquare = Square.valueOf(move.getFrom().toUpperCase());
-        Square toSquare = Square.valueOf(move.getTo().toUpperCase());
-        
-        // Handle pawn promotions (e.g. promoting a pawn to a Queen)
-        if (move.getPromotion() != null && !move.getPromotion().isEmpty()) {
+        Square fromSquare = Square.valueOf(move.getFrom().trim().toUpperCase());
+        Square toSquare = Square.valueOf(move.getTo().trim().toUpperCase());
+
+        Piece movingPiece = board.getPiece(fromSquare);
+        boolean isPawn = movingPiece == Piece.WHITE_PAWN || movingPiece == Piece.BLACK_PAWN;
+        boolean isPromotionRank = (movingPiece == Piece.WHITE_PAWN && toSquare.name().endsWith("8"))
+                || (movingPiece == Piece.BLACK_PAWN && toSquare.name().endsWith("1"));
+
+        if (isPawn && isPromotionRank && move.getPromotion() != null && !move.getPromotion().isBlank()) {
             String side = board.getSideToMove().name();
-            // e.g., Creates "WHITE_QUEEN"
-            Piece promotionPiece = Piece.valueOf(side + "_" + move.getPromotion().toUpperCase()); 
+            String promoCode = move.getPromotion().trim().toUpperCase();
+            String pieceName = switch (promoCode) {
+                case "Q", "QUEEN" -> "QUEEN";
+                case "R", "ROOK" -> "ROOK";
+                case "B", "BISHOP" -> "BISHOP";
+                case "N", "KNIGHT" -> "KNIGHT";
+                default -> "QUEEN";
+            };
+            Piece promotionPiece = Piece.valueOf(side + "_" + pieceName);
             return new com.github.bhlangonijr.chesslib.move.Move(fromSquare, toSquare, promotionPiece);
         }
-        
+
         return new com.github.bhlangonijr.chesslib.move.Move(fromSquare, toSquare);
     }
 }
