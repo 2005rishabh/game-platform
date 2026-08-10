@@ -4,52 +4,83 @@ import { Chess } from "chess.js";
 import { Chessboard } from "react-chessboard";
 import { useWebSocket } from "../hooks/useWebSocket";
 
+interface IncomingSession {
+  player1?: { username: string };
+  player2?: { username: string };
+  state?: { boardState?: string };
+}
+
 export default function GameRoom() {
   const { sessionId } = useParams();
 
-  // Extract all the necessary variables and functions from the hook
   const { isConnected, publishMove, subscribeToGame, stompClient } =
     useWebSocket();
 
   // Initialize the headless chess engine
   const [game, setGame] = useState(new Chess());
 
-  // 📥 NEW: Listen for opponent moves and authoritative state from the server
+  // NEW: State for player color and turn enforcement
+  const [playerColor, setPlayerColor] = useState<"white" | "black">("white");
+  const [isMyTurn, setIsMyTurn] = useState<boolean>(false);
+
+  // NEW: Track if we have received the initial state from the server
+  const [hasReceivedState, setHasReceivedState] = useState<boolean>(false);
+
+  // NEW: Grab the logged-in username to determine if they are Player 1 (White) or Player 2 (Black)
+  const currentUsername = localStorage.getItem("username") || "rishabh";
+
   useEffect(() => {
-    // Wait until the connection is fully established before subscribing
     if (!isConnected || !sessionId || !stompClient || !subscribeToGame) return;
 
     console.log("Subscribing to game room channel: ", sessionId);
 
-    const subscription = subscribeToGame(sessionId, (incomingSession) => {
-      console.log(
-        "📥 Authoritative game state received from server!",
-        incomingSession,
-      );
+    const subscription = subscribeToGame(
+      sessionId,
+      (incomingSession: IncomingSession) => {
+        console.log(
+          "Authoritative game state received from server!",
+          incomingSession,
+        );
 
-      // Verify the payload structure matches your Java GameSession & GameState models
-      const boardState = incomingSession?.state?.boardState;
+        setHasReceivedState(true);
 
-      if (boardState) {
+        // 1. Determine Player Role (White or Black)
+        let myRole: "white" | "black" = "white";
+        if (incomingSession?.player2?.username === currentUsername) {
+          myRole = "black";
+        }
+        setPlayerColor(myRole);
+
+        // 2. Process the Authoritative Board State
+        const boardState = incomingSession?.state?.boardState;
+
+        // REMOVED the `if (boardState)` wrapper so it ALWAYS calculates the turn
         setGame((currentGame) => {
           const gameCopy = new Chess();
           try {
-            // Force the local UI board to exactly match the server's FEN string
-            gameCopy.load(boardState);
+            // If the server sends a saved board state, load it.
+            // If not, gameCopy just stays at the default starting position.
+            if (boardState) {
+              gameCopy.load(boardState);
+            }
+
+            // 3. Update Turn Status (chess.js uses 'w' and 'b')
+            const activeTurnColor = gameCopy.turn() === "w" ? "white" : "black";
+            setIsMyTurn(activeTurnColor === myRole);
+
             return gameCopy;
           } catch (e) {
             console.error("Failed to load authoritative FEN from server:", e);
             return currentGame;
           }
         });
-      }
-    });
+      },
+    );
 
-    // Cleanup: Unsubscribe when the player leaves the room/component unmounts
     return () => {
       if (subscription) subscription.unsubscribe();
     };
-  }, [isConnected, sessionId, stompClient, subscribeToGame]);
+  }, [isConnected, sessionId, stompClient, subscribeToGame, currentUsername]);
 
   function onDrop({
     sourceSquare,
@@ -58,7 +89,9 @@ export default function GameRoom() {
     sourceSquare: string;
     targetSquare: string | null;
   }) {
-    if (!targetSquare) {
+    // NEW: Block moves if it's not the user's turn (UNLESS we are waiting for the server to wake up!)
+    if (!targetSquare || (!isMyTurn && hasReceivedState)) {
+      console.warn("Not your turn!");
       return false;
     }
 
@@ -81,7 +114,9 @@ export default function GameRoom() {
           promotion: promotionChoice,
         });
       } catch {
-        console.warn(`Illegal or out-of-turn move: ${sourceSquare} to ${targetSquare}`);
+        console.warn(
+          `Illegal or out-of-turn move: ${sourceSquare} to ${targetSquare}`,
+        );
         return false;
       }
 
@@ -105,10 +140,13 @@ export default function GameRoom() {
     }
   }
 
+  // NEW: Updated boardOptions with boardOrientation and allowDragging logic
   const boardOptions = {
     position: game.fen(),
     onPieceDrop: onDrop,
-    allowDragging: true,
+    boardOrientation: playerColor,
+    // NEW: Allow dragging if it's our turn, OR if we are waiting for the server to wake up
+    allowDragging: isMyTurn || !hasReceivedState,
     boardStyle: { touchAction: "none" },
     darkSquareStyle: { backgroundColor: "#475569" },
     lightSquareStyle: { backgroundColor: "#94A3B8" },
@@ -124,19 +162,21 @@ export default function GameRoom() {
             TESTING MATCH
           </h2>
           <p className="text-xs text-gray-500 font-mono tracking-wider">
-            ID: {sessionId}
+            ID: {sessionId} | Playing as:{" "}
+            <span className="text-[var(--color-premium-gold)] uppercase font-bold">
+              {playerColor}
+            </span>
           </p>
         </div>
         <div className="flex flex-col items-end">
           <span className="text-xs tracking-[0.2em] text-gray-400 uppercase mb-1">
-            Server Status
+            Match Status
           </span>
           <div className="flex items-center gap-2">
-            <div
-              className={`w-2 h-2 rounded-full ${isConnected ? "bg-green-500 animate-pulse" : "bg-red-500"}`}
-            ></div>
-            <span className="text-sm font-bold tracking-widest text-[var(--color-premium-gold)]">
-              {isConnected ? "SYNCED" : "DISCONNECTED"}
+            <span
+              className={`text-sm font-bold tracking-widest ${isMyTurn ? "text-green-400 animate-pulse" : "text-yellow-500"}`}
+            >
+              {isMyTurn ? "YOUR TURN" : "OPPONENT'S TURN"}
             </span>
           </div>
         </div>
