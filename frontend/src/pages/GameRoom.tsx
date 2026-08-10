@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { Chess } from "chess.js";
 import { Chessboard } from "react-chessboard";
@@ -19,14 +19,21 @@ export default function GameRoom() {
   // Initialize the headless chess engine
   const [game, setGame] = useState(new Chess());
 
-  // NEW: State for player color and turn enforcement
+  // State for player color, turn enforcement, and state tracking
   const [playerColor, setPlayerColor] = useState<"white" | "black">("white");
   const [isMyTurn, setIsMyTurn] = useState<boolean>(false);
-
-  // NEW: Track if we have received the initial state from the server
   const [hasReceivedState, setHasReceivedState] = useState<boolean>(false);
+  const [isMovePending, setIsMovePending] = useState(false);
 
-  // NEW: Grab the logged-in username to determine if they are Player 1 (White) or Player 2 (Black)
+  // The server is authoritative. Keep a ref so websocket callbacks and drops
+  // always work from the latest confirmed position instead of a stale render.
+  const gameRef = useRef(game);
+  const pendingMoveRef = useRef(false);
+
+  // NEW: State to store move history so FEN reloads don't wipe notation
+  const [moveHistory, setMoveHistory] = useState<string[]>([]);
+
+  // Grab the logged-in username to determine if they are Player 1 (White) or Player 2 (Black)
   const currentUsername = localStorage.getItem("username") || "rishabh";
 
   useEffect(() => {
@@ -54,26 +61,45 @@ export default function GameRoom() {
         // 2. Process the Authoritative Board State
         const boardState = incomingSession?.state?.boardState;
 
-        // REMOVED the `if (boardState)` wrapper so it ALWAYS calculates the turn
-        setGame((currentGame) => {
-          const gameCopy = new Chess();
-          try {
-            // If the server sends a saved board state, load it.
-            // If not, gameCopy just stays at the default starting position.
-            if (boardState) {
-              gameCopy.load(boardState);
+        if (!boardState) return;
+
+        try {
+          const nextGame = new Chess();
+          nextGame.load(boardState);
+
+          // Do not append notation optimistically. A move belongs in the
+          // history only after the backend broadcasts the resulting position.
+          const previousGame = gameRef.current;
+          if (previousGame.fen() !== nextGame.fen()) {
+            const confirmedMove = previousGame
+              .moves({ verbose: true })
+              .map((candidate) => {
+                const attempt = new Chess(previousGame.fen());
+                const move = attempt.move({
+                  from: candidate.from,
+                  to: candidate.to,
+                  promotion: candidate.promotion,
+                });
+                return attempt.fen() === nextGame.fen() ? move : null;
+              })
+              .find(Boolean);
+
+            if (confirmedMove) {
+              setMoveHistory((history) => [...history, confirmedMove.san]);
             }
-
-            // 3. Update Turn Status (chess.js uses 'w' and 'b')
-            const activeTurnColor = gameCopy.turn() === "w" ? "white" : "black";
-            setIsMyTurn(activeTurnColor === myRole);
-
-            return gameCopy;
-          } catch (e) {
-            console.error("Failed to load authoritative FEN from server:", e);
-            return currentGame;
           }
-        });
+
+          gameRef.current = nextGame;
+          setGame(nextGame);
+          setIsMovePending(false);
+          pendingMoveRef.current = false;
+
+          // 3. Update Turn Status from the confirmed state.
+          const activeTurnColor = nextGame.turn() === "w" ? "white" : "black";
+          setIsMyTurn(activeTurnColor === myRole);
+        } catch (e) {
+          console.error("Failed to load authoritative FEN from server:", e);
+        }
       },
     );
 
@@ -89,8 +115,12 @@ export default function GameRoom() {
     sourceSquare: string;
     targetSquare: string | null;
   }) {
-    // NEW: Block moves if it's not the user's turn (UNLESS we are waiting for the server to wake up!)
-    if (!targetSquare || (!isMyTurn && hasReceivedState)) {
+    if (
+      !targetSquare ||
+      isMovePending ||
+      pendingMoveRef.current ||
+      (!isMyTurn && hasReceivedState)
+    ) {
       console.warn("Not your turn!");
       return false;
     }
@@ -98,7 +128,7 @@ export default function GameRoom() {
     console.log(`Attempting to move from ${sourceSquare} to ${targetSquare}`);
 
     try {
-      const gameCopy = new Chess(game.fen());
+      const gameCopy = new Chess(gameRef.current.fen());
       const movingPiece = gameCopy.get(sourceSquare as any);
       const isPawn = movingPiece && movingPiece.type === "p";
       const isPromotionRank =
@@ -125,12 +155,16 @@ export default function GameRoom() {
         return false;
       }
 
-      setGame(gameCopy);
-      console.log("Move successful on the local board!");
-
-      // 🚀 FIRE THE MOVE TO THE SPRING BOOT BACKEND
       if (sessionId && publishMove) {
+        // Do not mutate the board locally. The next websocket message is the
+        // only commit, preventing local state from racing server state.
+        pendingMoveRef.current = true;
+        setIsMovePending(true);
         publishMove(sessionId, sourceSquare, targetSquare, promotionChoice);
+        console.log("Move submitted; waiting for authoritative server state.");
+      } else {
+        console.error("Cannot submit move: game session is unavailable.");
+        return false;
       }
 
       return true;
@@ -140,18 +174,26 @@ export default function GameRoom() {
     }
   }
 
-  // NEW: Updated boardOptions with boardOrientation and allowDragging logic
   const boardOptions = {
     position: game.fen(),
     onPieceDrop: onDrop,
     boardOrientation: playerColor,
-    // NEW: Allow dragging if it's our turn, OR if we are waiting for the server to wake up
-    allowDragging: isMyTurn || !hasReceivedState,
+    allowDragging: !isMovePending && (isMyTurn || !hasReceivedState),
     boardStyle: { touchAction: "none" },
     darkSquareStyle: { backgroundColor: "#475569" },
     lightSquareStyle: { backgroundColor: "#94A3B8" },
     animationDurationInMs: 300,
   };
+
+  // Group our moveHistory state into standard pairs [Turn, White Move, Black Move]
+  const movePairs = [];
+  for (let i = 0; i < moveHistory.length; i += 2) {
+    movePairs.push({
+      turn: Math.floor(i / 2) + 1,
+      white: moveHistory[i],
+      black: moveHistory[i + 1] || "",
+    });
+  }
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-[var(--color-midnight)]">
@@ -194,10 +236,23 @@ export default function GameRoom() {
           <h3 className="text-sm font-serif text-[var(--color-premium-gold)] tracking-[0.2em] uppercase mb-4 border-b border-gray-700 pb-2">
             Live Notation
           </h3>
-          <div className="flex-1 overflow-y-auto font-mono text-sm text-gray-300 space-y-2">
-            <p className="text-gray-500 italic text-xs text-center mt-4">
-              Waiting for first move...
-            </p>
+          <div className="flex-1 overflow-y-auto font-mono text-sm space-y-1 pr-2">
+            {movePairs.length === 0 ? (
+              <p className="text-gray-500 italic text-xs text-center mt-4">
+                Waiting for first move...
+              </p>
+            ) : (
+              movePairs.map((pair) => (
+                <div
+                  key={pair.turn}
+                  className="flex justify-between py-1 px-2 rounded hover:bg-gray-700 transition-colors"
+                >
+                  <span className="text-gray-500 w-8">{pair.turn}.</span>
+                  <span className="text-gray-200 flex-1">{pair.white}</span>
+                  <span className="text-gray-400 flex-1">{pair.black}</span>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>
