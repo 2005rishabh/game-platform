@@ -15,6 +15,7 @@ import com.rishabh.game_platform.game.application.service.GameService;
 import com.rishabh.game_platform.game.domain.model.GameSession;
 import com.rishabh.game_platform.game.domain.model.Move;
 import com.rishabh.game_platform.game.domain.model.Player;
+import com.rishabh.game_platform.shared.util.IdUtils;
 import com.rishabh.game_platform.game.domain.ports.GameStateRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -37,7 +38,8 @@ public class GameWebSocketController {
                         @Payload MoveRequest moveRequest,
                         Principal principal) {
 
-                if (sessionId == null || moveRequest == null || moveRequest.getFrom() == null || moveRequest.getTo() == null) {
+                if (sessionId == null || moveRequest == null || moveRequest.getFrom() == null
+                                || moveRequest.getTo() == null) {
                         return;
                 }
 
@@ -47,7 +49,7 @@ public class GameWebSocketController {
 
                 Player player = userRepository.findByUsername(username)
                                 .map(user -> Player.builder()
-                                                .userId(user.getId())
+                                                .userId(IdUtils.fromLong(user.getId()))
                                                 .username(user.getUsername())
                                                 .eloRating(user.getEloRating() != null ? user.getEloRating() : 1200)
                                                 .build())
@@ -69,9 +71,8 @@ public class GameWebSocketController {
                 } catch (Exception e) {
                         System.err.println("Failed to execute move: " + e.getMessage());
                         // Broadcast existing session state so clients sync back to valid board position
-                        gameStateRepository.findById(sessionId).ifPresent(existingSession ->
-                                messagingTemplate.convertAndSend("/topic/game/" + sessionId, existingSession)
-                        );
+                        gameStateRepository.findById(sessionId).ifPresent(existingSession -> messagingTemplate
+                                        .convertAndSend("/topic/game/" + sessionId, existingSession));
                 }
         }
 }

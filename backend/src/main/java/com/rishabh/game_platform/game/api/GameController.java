@@ -16,6 +16,7 @@ import com.rishabh.game_platform.game.api.dto.CreateGameRequest;
 import com.rishabh.game_platform.game.application.service.GameService;
 import com.rishabh.game_platform.game.domain.model.GameSession;
 import com.rishabh.game_platform.game.domain.model.Player;
+import com.rishabh.game_platform.shared.util.IdUtils;
 
 import lombok.RequiredArgsConstructor;
 
@@ -43,8 +44,8 @@ public class GameController {
     }
 
     /*
-    *Helper funtion to map a logged in Spring Security to our Domain Player
-    */
+     * Helper funtion to map a logged in Spring Security to our Domain Player
+     */
 
     private Player getAuthenticatedPlayer(Principal principal) {
         if (principal == null || principal.getName() == null || principal.getName().isBlank()) {
@@ -54,7 +55,7 @@ public class GameController {
         String username = principal.getName();
         return userRepository.findByUsername(username)
                 .map(user -> Player.builder()
-                        .userId(user.getId())
+                        .userId(IdUtils.fromLong(user.getId()))
                         .username(user.getUsername())
                         .eloRating(user.getEloRating() != null ? user.getEloRating() : 1200)
                         .build())

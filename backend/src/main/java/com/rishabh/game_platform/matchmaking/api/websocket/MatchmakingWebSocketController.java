@@ -45,10 +45,10 @@ public class MatchmakingWebSocketController {
         }
 
         // Safely converts "Guest_a1b2c3" or "rishabh" into a valid UUID
-        Long playerId = IdUtils.toLongId(rawPlayerId);
+        java.util.UUID playerId = IdUtils.toUuid(rawPlayerId);
 
         Player player = Player.builder()
-                .userId(playerId) // Keeps your UUID / Long model intact
+                .userId(playerId)
                 .username(username.isBlank() ? rawPlayerId : username)
                 .eloRating(1200)
                 .build();
@@ -67,7 +67,7 @@ public class MatchmakingWebSocketController {
 
         UUID playerId = parseToUuid(rawPlayerId);
         log.info("User UUID {} is aborting matchmaking.", playerId);
-        
+
         matchmakingService.processCancelRequest(playerId);
         // Matches signature: void processCancelRequest(UUID playerId)
     }

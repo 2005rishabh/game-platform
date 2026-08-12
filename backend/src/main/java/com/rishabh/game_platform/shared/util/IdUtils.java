@@ -5,20 +5,38 @@ import java.util.UUID;
 
 public class IdUtils {
 
+    // Preserve existing behaviour for compatibility when Long was expected
     public static Long toLongId(String input) {
         if (input == null || input.isBlank()) {
             return System.currentTimeMillis();
         }
 
         try {
-            // If the string is already a valid UUID format (e.g.
-            // "123e4567-e89b-12d3-a456-426614174000")
             return Long.parseLong(input);
         } catch (IllegalArgumentException e) {
-            // Fallback: Convert ANY string (e.g., "Guest_a1b2c3" or "rishabh") into a
-            // valid, consistent UUID
             UUID uid = UUID.nameUUIDFromBytes(input.getBytes(StandardCharsets.UTF_8));
             return Math.abs(uid.getMostSignificantBits());
         }
+    }
+
+    // Convert a free-form string (or UUID string) into a UUID
+    public static UUID toUuid(String input) {
+        if (input == null || input.isBlank()) {
+            return UUID.randomUUID();
+        }
+
+        try {
+            return UUID.fromString(input);
+        } catch (IllegalArgumentException e) {
+            return UUID.nameUUIDFromBytes(input.getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    // Convert a database Long id into a UUID deterministically
+    public static UUID fromLong(Long id) {
+        if (id == null) {
+            return UUID.randomUUID();
+        }
+        return UUID.nameUUIDFromBytes(id.toString().getBytes(StandardCharsets.UTF_8));
     }
 }

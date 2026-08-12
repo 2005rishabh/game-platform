@@ -1,5 +1,7 @@
 package com.rishabh.game_platform.game.domain.model;
 
+import java.util.UUID;
+
 import com.rishabh.game_platform.game.domain.enums.PlayerColor;
 
 import lombok.AllArgsConstructor;
@@ -13,7 +15,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 
 public class Player {
-    private Long userId;
+    private UUID userId;
     private String username;
     private PlayerColor color;
     private Integer eloRating;
