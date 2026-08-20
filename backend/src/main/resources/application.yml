@@ -19,5 +19,12 @@ spring:
       host: localhost
       port: 6379
 
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      # This tells Kafka to convert our Java objects into JSON automatically
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
 server:
   port: 8080
