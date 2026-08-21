@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWebSocket } from "../hooks/useWebSocket";
 import { authService } from "../services/authService";
 
 export default function Dashboard() {
   const [isSearching, setIsSearching] = useState(false);
+  const isSearchingRef = useRef(false);
   const { stompClient, isConnected } = useWebSocket();
   const navigate = useNavigate();
 
@@ -13,16 +14,18 @@ export default function Dashboard() {
   const playerId = username || "Guest_" + crypto.randomUUID().substring(0, 8);
 
   useEffect(() => {
-    // If the user cancels the search or leaves the page, make sure to clean up
+    // Only cancel when leaving the dashboard. Do not include isSearching here:
+    // changing it from false to true would run the previous cleanup and cancel
+    // the newly submitted matchmaking request immediately.
     return () => {
-      if (isSearching && stompClient && stompClient.connected) {
+      if (isSearchingRef.current && stompClient && stompClient.connected) {
         stompClient.publish({
           destination: "/app/matchmaking.cancel",
           body: JSON.stringify({ playerId }),
         });
       }
     };
-  }, [isSearching, stompClient, playerId]);
+  }, [stompClient, playerId]);
 
   const handleFindMatch = () => {
     if (!user.token) {
@@ -35,6 +38,7 @@ export default function Dashboard() {
       return;
     }
 
+    isSearchingRef.current = true;
     setIsSearching(true);
 
     // 1. Subscribe to a unique channel to listen for our match
@@ -65,6 +69,7 @@ export default function Dashboard() {
   };
 
   const handleCancelSearch = () => {
+    isSearchingRef.current = false;
     setIsSearching(false);
     if (stompClient && stompClient.connected) {
       stompClient.publish({

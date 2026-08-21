@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import com.rishabh.game_platform.matchmaking.application.service.MatchmakingService;
+import com.rishabh.game_platform.auth.infrastructure.persistence.UserRepository;
 import com.rishabh.game_platform.shared.util.IdUtils;
 import com.rishabh.game_platform.game.domain.enums.GameType;
 import com.rishabh.game_platform.game.domain.model.Player;
@@ -22,6 +23,7 @@ import com.rishabh.game_platform.game.domain.model.Player;
 public class MatchmakingWebSocketController {
 
     private final MatchmakingService matchmakingService;
+    private final UserRepository userRepository;
 
     private UUID parseToUuid(String input) {
         if (input == null || input.isBlank()) {
@@ -44,8 +46,13 @@ public class MatchmakingWebSocketController {
             username = principal.getName();
         }
 
-        // Safely converts "Guest_a1b2c3" or "rishabh" into a valid UUID
-        java.util.UUID playerId = IdUtils.toUuid(rawPlayerId);
+        // Use the same UUID representation that GameWebSocketController uses for
+        // authenticated moves. Using a username-derived UUID here made every
+        // server-side turn check fail for registered users.
+        String fallbackPlayerId = rawPlayerId;
+        java.util.UUID playerId = userRepository.findByUsername(username)
+                .map(user -> IdUtils.fromLong(user.getId()))
+                .orElseGet(() -> IdUtils.toUuid(fallbackPlayerId));
 
         Player player = Player.builder()
                 .userId(playerId)

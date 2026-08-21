@@ -13,8 +13,13 @@ interface IncomingSession {
 export default function GameRoom() {
   const { sessionId } = useParams();
 
-  const { isConnected, publishMove, subscribeToGame, stompClient } =
-    useWebSocket();
+  const {
+    isConnected,
+    publishMove,
+    requestGameState,
+    subscribeToGame,
+    stompClient,
+  } = useWebSocket();
 
   // Initialize the headless chess engine
   const [game, setGame] = useState(new Chess());
@@ -103,10 +108,21 @@ export default function GameRoom() {
       },
     );
 
+    // The match notification can arrive before this page subscribes. Request
+    // the authoritative snapshot so both players always start from the same FEN.
+    requestGameState(sessionId);
+
     return () => {
       if (subscription) subscription.unsubscribe();
     };
-  }, [isConnected, sessionId, stompClient, subscribeToGame, currentUsername]);
+  }, [
+    isConnected,
+    sessionId,
+    requestGameState,
+    stompClient,
+    subscribeToGame,
+    currentUsername,
+  ]);
 
   function onDrop({
     sourceSquare,

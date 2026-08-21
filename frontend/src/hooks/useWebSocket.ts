@@ -88,5 +88,15 @@ export const useWebSocket = () => {
     []
   );
 
-  return { stompClient, isConnected, publishMove, subscribeToGame };
+  const requestGameState = useCallback((sessionId: string) => {
+    const client = clientRef.current;
+    if (client?.connected) {
+      client.publish({
+        destination: `/app/game/${sessionId}/state`,
+        body: '{}',
+      });
+    }
+  }, []);
+
+  return { stompClient, isConnected, publishMove, requestGameState, subscribeToGame };
 };

@@ -12,7 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 @RequiredArgsConstructor
 public class GameEventPublisher {
-    private final KafkaTemplate<Object, Object> kafkaTemplate;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
 
     private static final String GAME_ENDED_TOPIC = "game-ended-topic";
 

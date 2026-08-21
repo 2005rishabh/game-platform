@@ -1,6 +1,7 @@
 package com.rishabh.game_platform.game.application.service;
 
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.stereotype.Service;
 
@@ -23,6 +24,7 @@ public class GameService {
     private final GameEngine gameEngine;
     private final GameStateRepository gameStateRepository;
     private final GameEventPublisher gameEventPublisher;
+    private final ConcurrentHashMap<UUID, Object> gameLocks = new ConcurrentHashMap<>();
 
     public GameSession createGame(Player host, GameType gameType) {
         GameState initialState = gameEngine.initializeGame();
@@ -53,59 +55,78 @@ public class GameService {
     }
 
     public GameSession executeMove(UUID sessionId, Player player, Move move) {
-    if (sessionId == null || player == null || move == null) {
-        throw new IllegalArgumentException("SessionId, player, and move must not be null");
+        if (sessionId == null || player == null || move == null) {
+            throw new IllegalArgumentException("SessionId, player, and move must not be null");
+        }
+
+        Object gameLock = gameLocks.computeIfAbsent(sessionId, ignored -> new Object());
+        synchronized (gameLock) {
+            GameSession session = gameStateRepository.findById(sessionId)
+                    .orElseThrow(() -> new IllegalArgumentException("Game session not found"));
+
+            if (session.getStatus() != GameStatus.IN_PROGRESS) {
+                throw new IllegalStateException("Game is not in progress");
+            }
+
+            if (session.getState() == null) {
+                throw new IllegalStateException("Game state is corrupted or missing");
+            }
+
+            if (!isPlayerTurn(session, player)) {
+                throw new IllegalStateException("It is not this player's turn");
+            }
+
+            if (!gameEngine.isMoveValid(session, move)) {
+                throw new IllegalArgumentException("Invalid move");
+            }
+
+            // 1. Execute the move
+            GameState newState = gameEngine.executeMove(session, move);
+            session.setState(newState);
+            session.setStatus(newState.getStatus());
+
+            // 2. Save the immediate state
+            GameSession savedSession = gameStateRepository.save(session);
+
+            // 3. KAFKA PRODUCER: If the move ended the game, fire the event
+            if (savedSession.getStatus() != GameStatus.IN_PROGRESS) {
+
+                // Identify who won and who lost.
+                // The player who just made the valid move that ended the game is the winner.
+                String winnerId = player.getUserId().toString(); // Or getUsername() if you prefer strings
+
+                // Extract the opponent safely
+                Player opponent = session.getPlayer1().getUserId().equals(player.getUserId())
+                        ? session.getPlayer2()
+                        : session.getPlayer1();
+
+                String loserId = opponent.getUserId().toString();
+
+                // Create the event payload
+                GameEndedEvent event = new GameEndedEvent(
+                        sessionId,
+                        winnerId,
+                        loserId,
+                        savedSession.getStatus().name() // e.g., "CHECKMATE", "DRAW", etc.
+                );
+
+                // Fire and forget to Kafka!
+                gameEventPublisher.publishGameEnded(event);
+            }
+
+            return savedSession;
+        }
     }
 
-    GameSession session = gameStateRepository.findById(sessionId)
-            .orElseThrow(() -> new IllegalArgumentException("Game session not found"));
-
-    if (session.getStatus() != GameStatus.IN_PROGRESS) {
-        throw new IllegalStateException("Game is not in progress");
+    private boolean isPlayerTurn(GameSession session, Player player) {
+        boolean isWhite = session.getPlayer1() != null
+                && session.getPlayer1().getUserId() != null
+                && session.getPlayer1().getUserId().equals(player.getUserId());
+        boolean isBlack = session.getPlayer2() != null
+                && session.getPlayer2().getUserId() != null
+                && session.getPlayer2().getUserId().equals(player.getUserId());
+        String turn = session.getState().getCurrentTurn();
+        return (isWhite && "WHITE".equalsIgnoreCase(turn))
+                || (isBlack && "BLACK".equalsIgnoreCase(turn));
     }
-
-    if (session.getState() == null) {
-        throw new IllegalStateException("Game state is corrupted or missing");
-    }
-
-    if (!gameEngine.isMoveValid(session, move)) {
-        throw new IllegalArgumentException("Invalid move");
-    }
-
-    // 1. Execute the move
-    GameState newState = gameEngine.executeMove(session, move);
-    session.setState(newState);
-    session.setStatus(newState.getStatus());
-    
-    // 2. Save the immediate state
-    GameSession savedSession = gameStateRepository.save(session);
-
-    // 3. KAFKA PRODUCER: If the move ended the game, fire the event
-    if (savedSession.getStatus() != GameStatus.IN_PROGRESS) {
-        
-        // Identify who won and who lost. 
-        // The player who just made the valid move that ended the game is the winner.
-        String winnerId = player.getUserId().toString(); // Or getUsername() if you prefer strings
-        
-        // Extract the opponent safely
-        Player opponent = session.getPlayer1().getUserId().equals(player.getUserId()) 
-                ? session.getPlayer2() 
-                : session.getPlayer1();
-                
-        String loserId = opponent.getUserId().toString();
-
-        // Create the event payload
-        GameEndedEvent event = new GameEndedEvent(
-            sessionId,
-            winnerId,
-            loserId,
-            savedSession.getStatus().name() // e.g., "CHECKMATE", "DRAW", etc.
-        );
-        
-        // Fire and forget to Kafka!
-        gameEventPublisher.publishGameEnded(event);
-    }
-
-    return savedSession;
-}
 }

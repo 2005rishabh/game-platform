@@ -75,4 +75,13 @@ public class GameWebSocketController {
                                         .convertAndSend("/topic/game/" + sessionId, existingSession));
                 }
         }
+
+        @MessageMapping("/game/{sessionId}/state")
+        public void sendCurrentState(@DestinationVariable UUID sessionId) {
+                if (sessionId == null) {
+                        return;
+                }
+                gameStateRepository.findById(sessionId).ifPresent(
+                                session -> messagingTemplate.convertAndSend("/topic/game/" + sessionId, session));
+        }
 }
