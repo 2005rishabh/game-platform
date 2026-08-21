@@ -43,9 +43,13 @@ public class GameWebSocketController {
                         return;
                 }
 
-                String username = (principal != null && principal.getName() != null && !principal.getName().isBlank())
-                                ? principal.getName()
-                                : "Guest_Player";
+                String requestedUsername = (principal != null && principal.getName() != null
+                                && !principal.getName().isBlank())
+                                                ? principal.getName()
+                                                : moveRequest.getUsername();
+                final String username = requestedUsername == null || requestedUsername.isBlank()
+                                ? "Guest_Player"
+                                : requestedUsername;
 
                 Player player = userRepository.findByUsername(username)
                                 .map(user -> Player.builder()
@@ -69,7 +73,8 @@ public class GameWebSocketController {
                         // Broadcast the authoritative session state back to all clients in this room
                         messagingTemplate.convertAndSend("/topic/game/" + sessionId, updatedSession);
                 } catch (Exception e) {
-                        System.err.println("Failed to execute move: " + e.getMessage());
+                        System.err.println("Failed to execute move for " + username + " ("
+                                        + player.getUserId() + "): " + e.getMessage());
                         // Broadcast existing session state so clients sync back to valid board position
                         gameStateRepository.findById(sessionId).ifPresent(existingSession -> messagingTemplate
                                         .convertAndSend("/topic/game/" + sessionId, existingSession));

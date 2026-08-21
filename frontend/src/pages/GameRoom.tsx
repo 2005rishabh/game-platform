@@ -124,20 +124,33 @@ export default function GameRoom() {
     currentUsername,
   ]);
 
-  function onDrop({
-    sourceSquare,
-    targetSquare,
-  }: {
-    sourceSquare: string;
-    targetSquare: string | null;
-  }) {
+  function onDrop(
+    sourceSquareOrObj: string | { sourceSquare: string; targetSquare: string | null },
+    targetSquareStr?: string | null,
+  ) {
+    let sourceSquare: string;
+    let targetSquare: string | null;
+
+    if (typeof sourceSquareOrObj === "string") {
+      sourceSquare = sourceSquareOrObj;
+      targetSquare = targetSquareStr ?? null;
+    } else if (sourceSquareOrObj && typeof sourceSquareOrObj === "object") {
+      sourceSquare = sourceSquareOrObj.sourceSquare;
+      targetSquare = sourceSquareOrObj.targetSquare;
+    } else {
+      return false;
+    }
+
     if (
       !targetSquare ||
+      sourceSquare === targetSquare ||
       isMovePending ||
       pendingMoveRef.current ||
       (!isMyTurn && hasReceivedState)
     ) {
-      console.warn("Not your turn!");
+      if (sourceSquare !== targetSquare && !isMyTurn) {
+        console.warn("Not your turn!");
+      }
       return false;
     }
 
@@ -176,7 +189,13 @@ export default function GameRoom() {
         // only commit, preventing local state from racing server state.
         pendingMoveRef.current = true;
         setIsMovePending(true);
-        publishMove(sessionId, sourceSquare, targetSquare, promotionChoice);
+        publishMove(
+          sessionId,
+          sourceSquare,
+          targetSquare,
+          promotionChoice,
+          currentUsername,
+        );
         console.log("Move submitted; waiting for authoritative server state.");
       } else {
         console.error("Cannot submit move: game session is unavailable.");

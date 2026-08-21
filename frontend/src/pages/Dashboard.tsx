@@ -49,6 +49,10 @@ export default function Dashboard() {
 
         console.log("Match found!", matchData);
 
+        // Mark search as complete so unmount cleanup does not fire cancel frame
+        isSearchingRef.current = false;
+        setIsSearching(false);
+
         // Clean up the subscription since we found a match
         subscription.unsubscribe();
 

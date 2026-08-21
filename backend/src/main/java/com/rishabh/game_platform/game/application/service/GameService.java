@@ -90,17 +90,12 @@ public class GameService {
 
             // 3. KAFKA PRODUCER: If the move ended the game, fire the event
             if (savedSession.getStatus() != GameStatus.IN_PROGRESS) {
-
-                // Identify who won and who lost.
-                // The player who just made the valid move that ended the game is the winner.
-                String winnerId = player.getUserId().toString(); // Or getUsername() if you prefer strings
-
-                // Extract the opponent safely
-                Player opponent = session.getPlayer1().getUserId().equals(player.getUserId())
+                String winnerId = getPlayerIdentifier(player);
+                Player opponent = isSamePlayer(session.getPlayer1(), player)
                         ? session.getPlayer2()
                         : session.getPlayer1();
 
-                String loserId = opponent.getUserId().toString();
+                String loserId = getPlayerIdentifier(opponent);
 
                 // Create the event payload
                 GameEndedEvent event = new GameEndedEvent(
@@ -110,7 +105,7 @@ public class GameService {
                         savedSession.getStatus().name() // e.g., "CHECKMATE", "DRAW", etc.
                 );
 
-                // Fire and forget to Kafka!
+                // Fire to Kafka!
                 gameEventPublisher.publishGameEnded(event);
             }
 
@@ -119,14 +114,32 @@ public class GameService {
     }
 
     private boolean isPlayerTurn(GameSession session, Player player) {
-        boolean isWhite = session.getPlayer1() != null
-                && session.getPlayer1().getUserId() != null
-                && session.getPlayer1().getUserId().equals(player.getUserId());
-        boolean isBlack = session.getPlayer2() != null
-                && session.getPlayer2().getUserId() != null
-                && session.getPlayer2().getUserId().equals(player.getUserId());
-        String turn = session.getState().getCurrentTurn();
+        boolean isWhite = isSamePlayer(session.getPlayer1(), player);
+        boolean isBlack = isSamePlayer(session.getPlayer2(), player);
+        String turn = session.getState() != null ? session.getState().getCurrentTurn() : null;
         return (isWhite && "WHITE".equalsIgnoreCase(turn))
                 || (isBlack && "BLACK".equalsIgnoreCase(turn));
+    }
+
+    private boolean isSamePlayer(Player p1, Player p2) {
+        if (p1 == null || p2 == null) return false;
+        if (p1.getUserId() != null && p2.getUserId() != null) {
+            return p1.getUserId().equals(p2.getUserId());
+        }
+        if (p1.getUsername() != null && p2.getUsername() != null) {
+            return p1.getUsername().equalsIgnoreCase(p2.getUsername());
+        }
+        return false;
+    }
+
+    private String getPlayerIdentifier(Player player) {
+        if (player == null) return "Unknown";
+        if (player.getUsername() != null && !player.getUsername().isBlank()) {
+            return player.getUsername();
+        }
+        if (player.getUserId() != null) {
+            return player.getUserId().toString();
+        }
+        return "Unknown";
     }
 }

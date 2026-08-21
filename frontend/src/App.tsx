@@ -3,8 +3,9 @@ import Dashboard from "./pages/Dashboard";
 import GameRoom from "./pages/GameRoom";
 import Login from "./pages/Login";
 import { useWebSocket } from "./hooks/useWebSocket";
+import { WebSocketProvider } from "./context/WebSocketContext";
 
-function App() {
+function AppContent() {
   const { isConnected } = useWebSocket();
 
   return (
@@ -25,6 +26,14 @@ function App() {
         </Routes>
       </div>
     </Router>
+  );
+}
+
+function App() {
+  return (
+    <WebSocketProvider>
+      <AppContent />
+    </WebSocketProvider>
   );
 }
 

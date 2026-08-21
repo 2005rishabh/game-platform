@@ -17,8 +17,22 @@ public class GameEventPublisher {
     private static final String GAME_ENDED_TOPIC = "game-ended-topic";
 
     public void publishGameEnded(GameEndedEvent event) {
-        // Using the gameId as the Kafka key to ensure events for the same game stay in order
-        kafkaTemplate.send(GAME_ENDED_TOPIC, event.gameId().toString(), event);
-        log.info("Published GameEndedEvent to Kafka for Game ID: {}", event.gameId());
+        if (event == null || event.gameId() == null) {
+            log.warn("Cannot publish null GameEndedEvent or missing gameId");
+            return;
+        }
+
+        String messageKey = event.gameId().toString();
+
+        // Using gameId as key to guarantee partition order in Kafka
+        kafkaTemplate.send(GAME_ENDED_TOPIC, messageKey, event)
+                .whenComplete((result, ex) -> {
+                    if (ex == null) {
+                        log.info("Successfully published GameEndedEvent to Kafka for Game ID: {}, Winner: {}, Loser: {}",
+                                event.gameId(), event.winnerId(), event.loserId());
+                    } else {
+                        log.error("Failed to publish GameEndedEvent to Kafka for Game ID: {}", event.gameId(), ex);
+                    }
+                });
     }
 }
