@@ -38,12 +38,11 @@ public class MatchmakingService {
             return;
         }
 
-        log.info("Player joining Redis queue: {}", player.getUsername());
+        log.info("Player joining matchmaking queue: {}", player.getUsername());
 
-        // 1. Add player to the Redis Cache
-        matchmakingQueue.addPlayer(player, gameType);
-
-        // 2. Try to pull an opponent from the Redis Cache
+        // Look for someone who is already waiting before adding this player.
+        // Adding first causes the queue implementation to pop the current player
+        // as a self-match, leaving nobody available for the next request.
         Optional<Player> opponentOpt = matchmakingQueue.extractOpponent(gameType, player);
 
         if (opponentOpt.isPresent()) {
@@ -76,6 +75,10 @@ public class MatchmakingService {
             // Assuming your frontend subscribes to /topic/match/{playerId} or {username}
             messagingTemplate.convertAndSend("/topic/match/" + player.getUsername(), matchData);
             messagingTemplate.convertAndSend("/topic/match/" + opponent.getUsername(), matchData);
+        } else {
+            // No opponent is waiting, so this player becomes the waiting player.
+            matchmakingQueue.addPlayer(player, gameType);
+            log.info("No opponent available; queued player {}", player.getUsername());
         }
     }
 
@@ -83,4 +86,4 @@ public class MatchmakingService {
         log.info("Processing cancel request for player UUID: {}", playerId);
         matchmakingQueue.removePlayer(playerId);
     }
-} 
+}

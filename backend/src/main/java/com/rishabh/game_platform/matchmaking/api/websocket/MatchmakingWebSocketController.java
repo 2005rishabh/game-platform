@@ -72,7 +72,13 @@ public class MatchmakingWebSocketController {
             rawPlayerId = principal.getName();
         }
 
-        UUID playerId = parseToUuid(rawPlayerId);
+        String fallbackPlayerId = rawPlayerId;
+        UUID playerId = userRepository.findByUsername(
+                principal != null && principal.getName() != null && !principal.getName().isBlank()
+                    ? principal.getName()
+                    : rawPlayerId)
+            .map(user -> IdUtils.fromLong(user.getId()))
+                .orElseGet(() -> parseToUuid(fallbackPlayerId));
         log.info("User UUID {} is aborting matchmaking.", playerId);
 
         matchmakingService.processCancelRequest(playerId);
