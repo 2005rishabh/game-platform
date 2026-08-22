@@ -31,3 +31,20 @@ build/
 
 ### VS Code ###
 .vscode/
+
+
+
+# Environment Variables (CRITICAL)
+.env
+
+# Compiled class files
+target/
+*.class
+
+# IDE specific files
+.idea/
+*.iml
+.vscode/
+
+# MacOS
+.DS_Store

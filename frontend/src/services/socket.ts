@@ -20,9 +20,11 @@ export const createStompClient = (token?: string) => {
     return bearerToken ? { Authorization: bearerToken } : undefined;
   };
 
+  // Instead of hardcoding 'http://localhost:8080/ws':
+  const WS_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
   const client = new Client({
     // We use SockJS as a fallback and to match the Spring Boot configuration
-    webSocketFactory: () => new SockJS('http://localhost:8080/ws'),
+    webSocketFactory: () => new SockJS(WS_URL),
     connectHeaders: getHeaders(),
 
     // This will print STOMP frames to browser console for debugging
