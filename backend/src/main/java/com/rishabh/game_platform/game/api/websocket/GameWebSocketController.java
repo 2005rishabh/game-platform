@@ -89,4 +89,38 @@ public class GameWebSocketController {
                 gameStateRepository.findById(sessionId).ifPresent(
                                 session -> messagingTemplate.convertAndSend("/topic/game/" + sessionId, session));
         }
+
+        @MessageMapping("/game/{sessionId}/resign")
+        public void resignMatch(@DestinationVariable UUID sessionId,
+                        @Payload(required = false) MoveRequest resignRequest,
+                        Principal principal) {
+                if (sessionId == null) return;
+                String requestedUsername = (principal != null && principal.getName() != null && !principal.getName().isBlank())
+                                ? principal.getName()
+                                : (resignRequest != null ? resignRequest.getUsername() : "Guest_Player");
+                Player player = Player.builder().username(requestedUsername).build();
+                try {
+                        GameSession session = gameService.resignGame(sessionId, player);
+                        messagingTemplate.convertAndSend("/topic/game/" + sessionId, session);
+                } catch (Exception e) {
+                        System.err.println("Failed to process resignation: " + e.getMessage());
+                }
+        }
+
+        @MessageMapping("/game/{sessionId}/draw")
+        public void offerDraw(@DestinationVariable UUID sessionId,
+                        @Payload(required = false) MoveRequest drawRequest,
+                        Principal principal) {
+                if (sessionId == null) return;
+                String requestedUsername = (principal != null && principal.getName() != null && !principal.getName().isBlank())
+                                ? principal.getName()
+                                : (drawRequest != null ? drawRequest.getUsername() : "Guest_Player");
+                Player player = Player.builder().username(requestedUsername).build();
+                try {
+                        GameSession session = gameService.drawGame(sessionId, player);
+                        messagingTemplate.convertAndSend("/topic/game/" + sessionId, session);
+                } catch (Exception e) {
+                        System.err.println("Failed to process draw offer: " + e.getMessage());
+                }
+        }
 }

@@ -113,6 +113,74 @@ public class GameService {
         }
     }
 
+    public GameSession resignGame(UUID sessionId, Player player) {
+        if (sessionId == null || player == null) {
+            throw new IllegalArgumentException("SessionId and player must not be null");
+        }
+
+        Object gameLock = gameLocks.computeIfAbsent(sessionId, ignored -> new Object());
+        synchronized (gameLock) {
+            GameSession session = gameStateRepository.findById(sessionId)
+                    .orElseThrow(() -> new IllegalArgumentException("Game session not found"));
+
+            if (session.getStatus() != GameStatus.IN_PROGRESS) {
+                return session;
+            }
+
+            boolean isPlayer1Resigning = isSamePlayer(session.getPlayer1(), player);
+            Player winner = isPlayer1Resigning ? session.getPlayer2() : session.getPlayer1();
+            Player loser = isPlayer1Resigning ? session.getPlayer1() : session.getPlayer2();
+
+            GameStatus finalStatus = isPlayer1Resigning ? GameStatus.BLACK_WON : GameStatus.WHITE_WON;
+            session.setStatus(finalStatus);
+
+            GameSession savedSession = gameStateRepository.save(session);
+
+            GameEndedEvent event = new GameEndedEvent(
+                    sessionId,
+                    getPlayerIdentifier(winner),
+                    getPlayerIdentifier(loser),
+                    "RESIGNATION"
+            );
+            gameEventPublisher.publishGameEnded(event);
+
+            return savedSession;
+        }
+    }
+
+    public GameSession drawGame(UUID sessionId, Player player) {
+        if (sessionId == null || player == null) {
+            throw new IllegalArgumentException("SessionId and player must not be null");
+        }
+
+        Object gameLock = gameLocks.computeIfAbsent(sessionId, ignored -> new Object());
+        synchronized (gameLock) {
+            GameSession session = gameStateRepository.findById(sessionId)
+                    .orElseThrow(() -> new IllegalArgumentException("Game session not found"));
+
+            if (session.getStatus() != GameStatus.IN_PROGRESS) {
+                return session;
+            }
+
+            session.setStatus(GameStatus.DRAW);
+            GameSession savedSession = gameStateRepository.save(session);
+
+            Player opponent = isSamePlayer(session.getPlayer1(), player)
+                    ? session.getPlayer2()
+                    : session.getPlayer1();
+
+            GameEndedEvent event = new GameEndedEvent(
+                    sessionId,
+                    getPlayerIdentifier(player),
+                    getPlayerIdentifier(opponent),
+                    "DRAW"
+            );
+            gameEventPublisher.publishGameEnded(event);
+
+            return savedSession;
+        }
+    }
+
     private boolean isPlayerTurn(GameSession session, Player player) {
         boolean isWhite = isSamePlayer(session.getPlayer1(), player);
         boolean isBlack = isSamePlayer(session.getPlayer2(), player);
