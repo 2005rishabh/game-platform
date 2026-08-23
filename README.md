@@ -4,6 +4,16 @@ A production-grade, event-driven, full-stack multiplayer gaming platform built w
 
 ---
 
+<!-- Badges showcasing CI, coverage, and Docker -->
+
+[![Build Status](https://github.com/2005rishabh/game-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/2005rishabh/game-platform/actions)
+[![Codecov](https://codecov.io/gh/2005rishabh/game-platform/branch/main/graph/badge.svg)](https://codecov.io/gh/2005rishabh/game-platform)
+[![Docker Pulls](https://img.shields.io/docker/pulls/2005rishabh/game-platform.svg)](https://hub.docker.com/r/2005rishabh/game-platform)
+[![Frontend Status](https://img.shields.io/website?down_color=red&down_message=down&up_message=up&url=https%3A%2F%2Fgame-platform-orpin-zeta.vercel.app)](https://game-platform-orpin-zeta.vercel.app)
+[![Backend Status](https://img.shields.io/website?down_color=red&down_message=down&up_message=up&url=https%3A%2F%2Fgame-platform-n1k1.onrender.com)](https://game-platform-n1k1.onrender.com)
+[![Vercel Deploys](https://img.shields.io/badge/vercel-deploys-blue?logo=vercel)](https://vercel.com)
+[![Render Deploys](https://img.shields.io/badge/render-deploys-blue?logo=render)](https://dashboard.render.com)
+
 ## Live Demos
 
 - **Frontend (Client):** https://game-platform-orpin-zeta.vercel.app/
@@ -21,6 +31,41 @@ A production-grade, event-driven, full-stack multiplayer gaming platform built w
 - [Key Platform Features](#4-key-platform-features)
 - [Local Setup & Installation](#5-local-setup--installation)
 - [WebSocket STOMP API Documentation](#6-websocket-stomp-api-documentation)
+
+## Deployment
+
+This project is deployed on Render (backend) and Vercel (frontend). Below are concise steps and tips to deploy and configure both services.
+
+- Backend (Render)
+  1. Build a container or use the provided `backend/Dockerfile`.
+  2. In the Render dashboard, create a new Web Service and connect your GitHub repo.
+  3. Set the build command (if using Docker, Render will build the image). For Maven-based deploys without Docker use:
+
+     ```bash
+     ./mvnw clean package -DskipTests
+     java -jar backend/target/*.jar
+     ```
+
+  4. Environment variables to set on Render:
+     - `SPRING_PROFILES_ACTIVE=prod` (optional)
+     - Database/Redis/Kafka connection strings (e.g. `SPRING_DATASOURCE_URL`, `SPRING_REDIS_URL`)
+     - `JWT_SECRET` and any other secrets
+  5. (Optional) Keep service warm: use the `/health` endpoint added to the app and an external monitor (UptimeRobot or GitHub Actions) to hit `/health` regularly.
+
+- Frontend (Vercel)
+  1. In Vercel, import the repo and set the project root to `frontend`.
+  2. Set the environment variable `VITE_API_URL` to your backend base URL, for example:
+
+     `https://game-platform-n1k1.onrender.com`
+
+     Important: Vite injects env vars at build-time. Do NOT include brackets or markdown formatting.
+
+  3. Build & Output settings (Vercel):
+     - Framework Preset: `Vite` or `Other` with `npm run build`
+     - Build Command: `npm run build`
+     - Output Directory: `dist`
+
+  4. Deploy. For preview deployments, consider adding `*.vercel.app` or preview domains to Render CORS if you test previews.
 
 ## 1. Project Executive Summary
 
@@ -374,3 +419,7 @@ The frontend dev server runs on `http://localhost:5173`.
 | `/app/game/{sessionId}/draw`   | SEND         | `{ "username": "string" }`                       | Offer/accept draw.                |
 | `/app/game/{sessionId}/state`  | SEND         | `{}`                                             | Request game state snapshot.      |
 | `/topic/game/{sessionId}`      | SUBSCRIBE    | `GameSession Object`                             | Receive authoritative game state. |
+
+---
+
+Made with ❤️ by rishabh singh
