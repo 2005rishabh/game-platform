@@ -35,7 +35,7 @@ public class SecurityConfig {
 
                 // 3. Permit WebSocket handshake, authentication endpoints, and error path
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/ws/**", "/auth/api/**", "/error").permitAll()
+                        .requestMatchers("/ws/**", "/auth/api/**", "/error", "/health").permitAll()
                         .anyRequest().authenticated())
 
                 // 4. Configure authentication provider & JWT filter
