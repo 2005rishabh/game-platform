@@ -48,7 +48,13 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         // This is the initial handshake URL the React frontend uses to establish the
         // connection
         registry.addEndpoint("/ws")
-                .setAllowedOrigins("http://localhost:5173", "http://127.0.0.1:5173") // <-- THE BOUNCER PASS
+                // Allow production frontend and backend origins in addition to localhost.
+                // For deployment you may restrict this to the exact origins instead of
+                // patterns.
+                .setAllowedOrigins(
+                        "http://localhost:5173",
+                        "http://127.0.0.1:5173",
+                        "https://game-platform-orpin-zeta.vercel.app") // <-- THE BOUNCER PASS
                 .addInterceptors(jwtHandshakeInterceptor)
                 .setHandshakeHandler(jwtPrincipalHandshakeHandler())
                 .withSockJS();

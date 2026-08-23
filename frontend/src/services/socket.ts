@@ -21,10 +21,24 @@ export const createStompClient = (token?: string) => {
   };
 
   // Instead of hardcoding 'http://localhost:8080/ws':
-  const WS_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+  const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+
+  // Normalize environment input (strip surrounding brackets or markdown links)
+  const sanitize = (u: string) => {
+    if (!u) return u;
+    // If user provided markdown-style [text](url), extract url
+    const mdMatch = u.match(/\((https?:\/\/[^)]+)\)/);
+    if (mdMatch) return mdMatch[1];
+    // Remove any surrounding brackets
+    return u.replace(/^\[+|\]+$/g, '');
+  };
+
+  const baseUrl = sanitize(rawApiUrl).replace(/\/$/, '');
+  const WS_ENDPOINT = `${baseUrl}/ws`;
+
   const client = new Client({
     // We use SockJS as a fallback and to match the Spring Boot configuration
-    webSocketFactory: () => new SockJS(WS_URL),
+    webSocketFactory: () => new SockJS(WS_ENDPOINT),
     connectHeaders: getHeaders(),
 
     // This will print STOMP frames to browser console for debugging
