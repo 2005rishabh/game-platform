@@ -1,4 +1,17 @@
-const API_BASE_URL = 'http://localhost:8080/auth/api';
+const rawApi = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+
+const sanitize = (u: string) => {
+  if (!u) return u;
+  const mdMatch = u.match(/\((https?:\/\/[^)]+)\)/);
+  if (mdMatch) return mdMatch[1];
+  u = u.replace(/^\[+/, '').replace(/\]+$/, '');
+  if (!/^https?:\/\//i.test(u)) {
+    u = `https://${u}`;
+  }
+  return u.replace(/\/$/, '');
+};
+
+const API_BASE_URL = `${sanitize(rawApi)}/auth/api`;
 
 export interface AuthResponse {
   token: string;
