@@ -4,11 +4,30 @@ A production-grade, event-driven, full-stack multiplayer gaming platform built w
 
 ---
 
+## Live Demos
+
+- **Frontend (Client):** https://game-platform-orpin-zeta.vercel.app/
+- **Backend (API / WebSockets):** https://game-platform-n1k1.onrender.com/
+
+## Table of Contents
+
+- [Project Executive Summary](#1-project-executive-summary)
+- [Technology Stack & Component Purpose](#2-technology-stack--component-purpose)
+- [System Architecture & Flowcharts](#3-system-architecture--flowcharts)
+  - [High-Level Architecture](#31-high-level-architecture-how-everything-is-linked)
+  - [Database & Cache Schema Design](#32-database--cache-schema-design-postgresql--redis)
+  - [Directory Structure Topology](#33-directory-structure-topology)
+  - [Execution Sequence Flows](#34-execution-sequence-flows)
+- [Key Platform Features](#4-key-platform-features)
+- [Local Setup & Installation](#5-local-setup--installation)
+- [WebSocket STOMP API Documentation](#6-websocket-stomp-api-documentation)
+
 ## 1. Project Executive Summary
 
 This platform delivers an enterprise-grade multiplayer experience featuring real-time state synchronization, automated matchmaking, event-driven ELO rating adjustments, and database persistence.
 
 ### Key Architectural Highlights
+
 - **Persistent STOMP WebSockets**: Global WebSocket context management enabling zero-latency game state synchronization and uninterrupted reconnection across route transitions.
 - **Distributed Redis Matchmaking**: High-throughput queue management for instant player pairing with zero self-matching edge cases.
 - **Event-Driven ELO Rating Engine**: Asynchronous Kafka event bus processing match outcomes and executing standard Elo rating adjustments (K=32 factor).
@@ -19,18 +38,18 @@ This platform delivers an enterprise-grade multiplayer experience featuring real
 
 ## 2. Technology Stack & Component Purpose
 
-| Layer / Technology | Technology Used | Purpose & Function |
-| :--- | :--- | :--- |
-| **Frontend Framework** | React 19, TypeScript, Vite | Component-driven UI rendering, type safety, fast client bundling. |
-| **Chess Engine & UI** | chess.js, react-chessboard | Headless rule validation, move evaluation, interactive board interface. |
-| **Audio Engine** | Web Audio API (Native Synthesizer) | Synthesized audio feedback for moves, captures, checks, and game over. |
-| **Real-Time Communication** | STOMP over SockJS / WebSockets | Duplex frame-based communication for matchmaking and live game turns. |
-| **Backend Framework** | Spring Boot 3.4, Java 21 | Microservice backend framework with dependency injection and modular packages. |
-| **Security & Auth** | Spring Security, JJWT (JWT) | Stateless token authentication, BCrypt password hashing, channel interceptors. |
-| **In-Memory Cache & Queue** | Redis, Spring Data Redis | High-speed matchmaking queue storage and fast session caching. |
-| **Event Streaming** | Apache Kafka, Spring Kafka | Distributed message broker for asynchronous post-match processing and rating updates. |
-| **Relational Database** | PostgreSQL, Spring Data JPA / Hibernate | Persistent storage for user accounts, historical match logs, and ELO ratings. |
-| **Containerization** | Docker, Docker Compose | Containerized orchestration for Redis, Kafka, Zookeeper, and PostgreSQL. |
+| Layer / Technology          | Technology Used                         | Purpose & Function                                                                    |
+| :-------------------------- | :-------------------------------------- | :------------------------------------------------------------------------------------ |
+| **Frontend Framework**      | React 19, TypeScript, Vite              | Component-driven UI rendering, type safety, fast client bundling.                     |
+| **Chess Engine & UI**       | chess.js, react-chessboard              | Headless rule validation, move evaluation, interactive board interface.               |
+| **Audio Engine**            | Web Audio API (Native Synthesizer)      | Synthesized audio feedback for moves, captures, checks, and game over.                |
+| **Real-Time Communication** | STOMP over SockJS / WebSockets          | Duplex frame-based communication for matchmaking and live game turns.                 |
+| **Backend Framework**       | Spring Boot 3.4, Java 21                | Microservice backend framework with dependency injection and modular packages.        |
+| **Security & Auth**         | Spring Security, JJWT (JWT)             | Stateless token authentication, BCrypt password hashing, channel interceptors.        |
+| **In-Memory Cache & Queue** | Redis, Spring Data Redis                | High-speed matchmaking queue storage and fast session caching.                        |
+| **Event Streaming**         | Apache Kafka, Spring Kafka              | Distributed message broker for asynchronous post-match processing and rating updates. |
+| **Relational Database**     | PostgreSQL, Spring Data JPA / Hibernate | Persistent storage for user accounts, historical match logs, and ELO ratings.         |
+| **Containerization**        | Docker, Docker Compose                  | Containerized orchestration for Redis, Kafka, Zookeeper, and PostgreSQL.              |
 
 ---
 
@@ -171,7 +190,7 @@ graph TD
 
     subgraph Backend_Tree ["Backend Package Structure (com.rishabh.game_platform)"]
         BE --> BE_SRC["src/main/java/com/rishabh/game_platform/"]
-        
+
         BE_SRC --> PKG_AUTH["auth/ (JWT Auth Controller, Service, UserEntity, UserRepository)"]
         BE_SRC --> PKG_GAME["game/"]
         BE_SRC --> PKG_MATCH["matchmaking/ (MatchmakingService, RedisMatchmakingQueue)"]
@@ -268,7 +287,7 @@ sequenceDiagram
 
     GameSvc->>KafkaProd: publishGameEnded(GameEndedEvent)
     KafkaProd->>KafkaTopic: send("game-ended-topic", key: gameId, event)
-    
+
     KafkaTopic-->>KafkaCons: @KafkaListener consumeGameEndedEvent(event)
     KafkaCons->>KafkaCons: Calculate ELO (K=32): Winner +16, Loser -16
     KafkaCons->>DB: Save updated UserEntity (ELO) & GameSessionEntity
@@ -279,6 +298,7 @@ sequenceDiagram
 ## 4. Key Platform Features
 
 ### Real-Time Gameplay & State Engine
+
 - **Authoritative Server Architecture**: Frontend sends move intents (`/app/game/{id}/move`); backend validates FEN positions and broadcasts authoritative game states.
 - **Check & Checkmate Visual Indicators**: Highlights the checked King square in red (`rgba(239, 68, 68, 0.85)`) when `game.inCheck()` returns true.
 - **Graveyard & Material Advantage Counter**: Calculates captured piece counts for White and Black, rendering captured SVG icons and material advantage scores (e.g., `+3`).
@@ -288,6 +308,7 @@ sequenceDiagram
 - **Game Over Modal**: Modal overlay displaying outcome, winner, end reason, and rating updates.
 
 ### Distributed Backend Infrastructure & Security
+
 - **Redis Distributed Matchmaking**: Queue implementation pairing players atomically in O(1) time without self-matching edge cases.
 - **Apache Kafka Asynchronous Event Streaming**: Match terminations publish `GameEndedEvent` to `game-ended-topic`.
 - **Automated ELO Engine**: Asynchronous Kafka consumer implementing standard Elo rating calculations ($K = 32$):
@@ -300,48 +321,56 @@ sequenceDiagram
 ## 5. Local Setup & Installation
 
 ### Prerequisites
+
 - Java 21 JDK
 - Node.js 20+ & npm
 - Docker & Docker Compose
 
 ### Step 1: Clone Repository
+
 ```bash
 git clone https://github.com/2005rishabh/game-platform.git
 cd game-platform
 ```
 
 ### Step 2: Start Infrastructure Services
+
 Start PostgreSQL, Redis, Kafka, and Zookeeper via Docker Compose:
+
 ```bash
 docker-compose up -d
 ```
 
 ### Step 3: Run Backend Service
+
 ```bash
 cd backend
 ./mvnw spring-boot:run
 ```
+
 The backend server runs on `http://localhost:8080`.
 
 ### Step 4: Run Frontend Application
+
 ```bash
 cd ../frontend
 npm install
 npm run dev
 ```
+
 The frontend dev server runs on `http://localhost:5173`.
 
 ---
 
 ## 6. WebSocket STOMP API Documentation
 
-| Destination | Message Type | Payload Structure | Description |
-| :--- | :--- | :--- | :--- |
-| `/app/matchmaking.join` | SEND | `{ "playerId": "string", "username": "string" }` | Enqueues player in Redis queue. |
-| `/app/matchmaking.cancel` | SEND | `{ "playerId": "string" }` | Removes player from queue. |
-| `/topic/match/{username}` | SUBSCRIBE | `{ "sessionId": "UUID" }` | Receive match notification. |
-| `/app/game/{sessionId}/move` | SEND | `{ "from": "e2", "to": "e4", "promotion": "q" }` | Submit move. |
-| `/app/game/{sessionId}/resign` | SEND | `{ "username": "string" }` | Resign current match. |
-| `/app/game/{sessionId}/draw` | SEND | `{ "username": "string" }` | Offer/accept draw. |
-| `/app/game/{sessionId}/state` | SEND | `{}` | Request game state snapshot. |
-| `/topic/game/{sessionId}` | SUBSCRIBE | `GameSession Object` | Receive authoritative game state. |
+| Destination                    | Message Type | Payload Structure                                | Description                       |
+| :----------------------------- | :----------- | :----------------------------------------------- | :-------------------------------- |
+| `/app/matchmaking.join`        | SEND         | `{ "playerId": "string", "username": "string" }` | Enqueues player in Redis queue.   |
+| `/app/matchmaking.cancel`      | SEND         | `{ "playerId": "string" }`                       | Removes player from queue.        |
+| `/topic/match/{username}`      | SUBSCRIBE    | `{ "sessionId": "UUID" }`                        | Receive match notification.       |
+| `/app/game/{sessionId}/move`   | SEND         | `{ "from": "e2", "to": "e4", "promotion": "q" }` | Submit move.                      |
+| `/app/game/{sessionId}/resign` | SEND         | `{ "username": "string" }`                       | Resign current match.             |
+| `/app/game/{sessionId}/draw`   | SEND         | `{ "username": "string" }`                       | Offer/accept draw.                |
+| `/app/game/{sessionId}/state`  | SEND         | `{}`                                             | Request game state snapshot.      |
+| `/topic/game/{sessionId}`      | SUBSCRIBE    | `GameSession Object`                             | Receive authoritative game state. |
