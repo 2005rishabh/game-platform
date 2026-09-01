@@ -28,10 +28,16 @@ import org.springframework.kafka.support.serializer.JsonSerializer;
 @Configuration
 public class KafkaConfig {
 
-    @Value("${spring.kafka.bootstrap-servers}")
+    @Value("${spring.kafka.bootstrap-servers:localhost:9092}")
     private String bootstrapServers;
 
-    @Value("${spring.kafka.properties.sasl.jaas.config}")
+    @Value("${spring.kafka.properties.security.protocol:SASL_SSL}")
+    private String securityProtocol;
+
+    @Value("${spring.kafka.properties.sasl.mechanism:SCRAM-SHA-256}")
+    private String saslMechanism;
+
+    @Value("${spring.kafka.properties.sasl.jaas.config:org.apache.kafka.common.security.scram.ScramLoginModule required username=\"user\" password=\"password\";}")
     private String saslJaasConfig;
 
     // Helper method to read the PEM file from resources at runtime
@@ -44,6 +50,18 @@ public class KafkaConfig {
         }
     }
 
+    private void applyKafkaSecurityProps(Map<String, Object> props) {
+        props.put("security.protocol", securityProtocol);
+        if (securityProtocol != null && securityProtocol.contains("SASL")) {
+            props.put(SaslConfigs.SASL_MECHANISM, saslMechanism);
+            props.put(SaslConfigs.SASL_JAAS_CONFIG, saslJaasConfig);
+        }
+        if (securityProtocol != null && securityProtocol.contains("SSL")) {
+            props.put(SslConfigs.SSL_TRUSTSTORE_CERTIFICATES_CONFIG, getPemCertString());
+            props.put(SslConfigs.SSL_TRUSTSTORE_TYPE_CONFIG, "PEM");
+        }
+    }
+
     @Bean
     public ProducerFactory<String, Object> producerFactory() {
         Map<String, Object> props = new HashMap<>();
@@ -51,14 +69,7 @@ public class KafkaConfig {
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
 
-        // --- AIVEN SECURITY SETTINGS ---
-        props.put("security.protocol", "SASL_SSL");
-        props.put(SaslConfigs.SASL_MECHANISM, "SCRAM-SHA-256");
-        props.put(SaslConfigs.SASL_JAAS_CONFIG, saslJaasConfig);
-
-        // Load PEM string directly
-        props.put(SslConfigs.SSL_TRUSTSTORE_CERTIFICATES_CONFIG, getPemCertString());
-        props.put(SslConfigs.SSL_TRUSTSTORE_TYPE_CONFIG, "PEM");
+        applyKafkaSecurityProps(props);
 
         return new DefaultKafkaProducerFactory<>(props);
     }
@@ -77,14 +88,7 @@ public class KafkaConfig {
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
         props.put(JsonDeserializer.TRUSTED_PACKAGES, "*");
 
-        // --- AIVEN SECURITY SETTINGS ---
-        props.put("security.protocol", "SASL_SSL");
-        props.put(SaslConfigs.SASL_MECHANISM, "SCRAM-SHA-256");
-        props.put(SaslConfigs.SASL_JAAS_CONFIG, saslJaasConfig);
-
-        // Load PEM string directly
-        props.put(SslConfigs.SSL_TRUSTSTORE_CERTIFICATES_CONFIG, getPemCertString());
-        props.put(SslConfigs.SSL_TRUSTSTORE_TYPE_CONFIG, "PEM");
+        applyKafkaSecurityProps(props);
 
         return new DefaultKafkaConsumerFactory<>(props);
     }

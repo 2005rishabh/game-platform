@@ -14,9 +14,14 @@ jobs:
           set -euo pipefail
           URL="https://game-platform-n1k1.onrender.com/health"
           echo "Pinging $URL"
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || echo 0)
-          echo "Status: $STATUS"
-          if [ "$STATUS" -ne 200 ]; then
-            echo "Health check failed (status=$STATUS)"
-            exit 1
-          fi
+          for i in {1..6}; do
+            STATUS=$(curl -s --max-time 15 -o /dev/null -w "%{http_code}" "$URL" || echo 0)
+            echo "Attempt $i: Status $STATUS"
+            if [ "$STATUS" -eq 200 ]; then
+              echo "Health check succeeded!"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Health check failed after 6 attempts."
+          exit 1
