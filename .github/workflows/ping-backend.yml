@@ -2,7 +2,7 @@ name: Ping backend health
 
 on:
   schedule:
-    - cron: "*/5 * * * *" # every 5 minutes
+    - cron: "*/14 * * * *" # every 14 minutes (Render free tier sleeps after 15 min)
   workflow_dispatch:
 
 jobs:
@@ -13,15 +13,18 @@ jobs:
         run: |
           set -euo pipefail
           URL="https://game-platform-n1k1.onrender.com/health"
-          echo "Pinging $URL"
-          for i in {1..6}; do
-            STATUS=$(curl -s --max-time 15 -o /dev/null -w "%{http_code}" "$URL" || echo 0)
+          echo "Pinging $URL to keep Render instance active..."
+          
+          for i in {1..3}; do
+            STATUS=$(curl -s --max-time 60 -o /dev/null -w "%{http_code}" "$URL" || echo 0)
             echo "Attempt $i: Status $STATUS"
             if [ "$STATUS" -eq 200 ]; then
-              echo "Health check succeeded!"
+              echo "Health check succeeded! Backend is awake."
               exit 0
             fi
-            sleep 10
+            sleep 15
           done
-          echo "Health check failed after 6 attempts."
-          exit 1
+          
+          echo "::warning title=Render Ping Warning::Backend endpoint did not respond with 200 OK. Render backend may be restarting or down."
+          exit 0
+
