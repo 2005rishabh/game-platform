@@ -103,7 +103,12 @@
             <artifactId>spring-security-oauth2-resource-server</artifactId>
             <scope>test</scope>
         </dependency>
-		
+		<!-- Required for @EmbeddedKafka testing -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka-test</artifactId>
+            <scope>test</scope>
+        </dependency>
 		<!-- jwt dependency -->
 		<dependency>
 			<groupId>io.jsonwebtoken</groupId>
