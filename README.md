@@ -1,4 +1,5 @@
-# Distributed Real-Time Multiplayer Chess Platform
+# Distributed Real-Time Multiplayer Chess
+Platform
 
 A production-grade, event-driven, full-stack multiplayer gaming platform built with Spring Boot 3, React 19, STOMP WebSockets, Redis, Apache Kafka, and PostgreSQL. Designed with domain-driven principles, decoupled architecture, and real-time state synchronization.
 

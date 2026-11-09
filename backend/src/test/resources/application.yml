@@ -10,12 +10,14 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: create-drop
+      ddl-auto: update
     database-platform: org.hibernate.dialect.H2Dialect
     show-sql: false
 
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${spring.embedded.kafka.brokers:localhost:9092}
+    properties:
+      security.protocol: PLAINTEXT
     listener:
       auto-startup: false # Disables Kafka listeners from automatically trying to connect during tests
   data:
